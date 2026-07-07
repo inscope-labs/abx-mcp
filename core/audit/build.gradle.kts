@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.core.audit"
+    namespace = "com.inscopelabs.abxmcp.core.audit"
     compileSdk = 36
 
     defaultConfig {
