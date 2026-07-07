@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.inscopelabs.abxmcp.core.policy"
+    namespace = "com.example.core.policy"
     compileSdk = 36
 
     defaultConfig {

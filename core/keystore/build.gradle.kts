@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.inscopelabs.abxmcp.core.keystore"
+    namespace = "com.example.core.keystore"
     compileSdk = 36
 
     defaultConfig {
