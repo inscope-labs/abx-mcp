@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.core.filesystem"
+    namespace = "com.inscopelabs.abxmcp.core.filesystem"
     compileSdk = 36
 
     defaultConfig {
