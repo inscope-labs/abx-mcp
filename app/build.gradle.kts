@@ -109,6 +109,7 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
+  implementation("com.google.zxing:core:3.5.3")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -116,6 +117,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
   testRuntimeOnly(libs.junit.platform.launcher)
+  testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
   testImplementation(libs.mockk)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
@@ -131,6 +133,7 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+  implementation(project(":core:keystore"))
 }
 
 tasks.withType<Test> {

@@ -21,8 +21,16 @@ class GreetingScreenshotTest {
 
   @Test
   fun greeting_screenshot() {
-    composeTestRule.setContent { MyApplicationTheme { Greeting("Robolectric") } }
+    val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+    val keyStoreManager = com.inscopelabs.abxmcp.core.keystore.KeyStoreManager(context)
+    
+    composeTestRule.setContent { 
+      MyApplicationTheme { 
+        EnrollmentScreen(keyStoreManager = keyStoreManager) 
+      } 
+    }
 
+    composeTestRule.waitForIdle()
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
   }
 }
