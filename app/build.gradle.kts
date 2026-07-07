@@ -134,6 +134,7 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
   implementation(project(":core:keystore"))
+  implementation(project(":core:session"))
 }
 
 tasks.withType<Test> {
