@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.core.session"
+    namespace = "com.inscopelabs.abxmcp.core.session"
     compileSdk = 36
 
     defaultConfig {
