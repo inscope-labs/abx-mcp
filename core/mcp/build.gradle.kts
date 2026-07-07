@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.core.mcp"
+    namespace = "com.inscopelabs.abxmcp.core.mcp"
     compileSdk = 36
 
     defaultConfig {
