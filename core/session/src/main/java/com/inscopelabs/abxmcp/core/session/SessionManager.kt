@@ -10,4 +10,8 @@ interface SessionManager {
     fun expireSession(): Boolean
     fun revokeSession(): Boolean
     fun getState(): SessionState
+    
+    fun getSessionTtl(): Int
+    fun setSessionTtl(seconds: Int)
+    fun decrementTtl(amountSeconds: Int = 1): Int
 }

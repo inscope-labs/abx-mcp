@@ -8,7 +8,23 @@ class SessionManagerImpl : SessionManager {
     private val _state = MutableStateFlow<SessionState>(SessionState.INACTIVE)
     override val stateFlow: StateFlow<SessionState> = _state.asStateFlow()
 
+    private var ttlSeconds: Int = 300
+
     override fun getState(): SessionState = _state.value
+
+    @Synchronized
+    override fun getSessionTtl(): Int = ttlSeconds
+
+    @Synchronized
+    override fun setSessionTtl(seconds: Int) {
+        ttlSeconds = seconds
+    }
+
+    @Synchronized
+    override fun decrementTtl(amountSeconds: Int): Int {
+        ttlSeconds = (ttlSeconds - amountSeconds).coerceAtLeast(0)
+        return ttlSeconds
+    }
 
     @Synchronized
     override fun startSession(trigger: UserGesture): Boolean {

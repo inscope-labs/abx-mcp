@@ -17,8 +17,8 @@ android {
     applicationId = "com.inscopelabs.abxmcp"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "2.0"
+    versionCode = 3
+    versionName = "3.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -122,6 +122,7 @@ dependencies {
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
   testImplementation(libs.roborazzi)
+  testImplementation(libs.androidx.work.testing)
   testImplementation(libs.roborazzi.compose)
   testImplementation(libs.roborazzi.junit.rule)
   androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -135,6 +136,7 @@ dependencies {
   "ksp"(libs.moshi.kotlin.codegen)
   implementation(project(":core:keystore"))
   implementation(project(":core:session"))
+  implementation(project(":core:tunnel"))
 }
 
 tasks.withType<Test> {

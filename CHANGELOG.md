@@ -2,6 +2,16 @@
 
 All notable changes to the ABX-MCP security architecture client will be documented in this file.
 
+## [1.2.0] - 2026-07-07
+
+### Added
+- **Phase 3: Tunnel Lifecycle Manager**:
+  - Implemented `TunnelService` in `:core:tunnel` as a Foreground Service using persistent status notifications compliant with Android 14+ (`ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE`).
+  - Added native packaging structure for `cloudflared` under `app/src/main/jniLibs/armeabi-v7a/` and `arm64-v8a/` paths.
+  - Implemented `TunnelManager` and `TunnelManagerImpl` to manage background `cloudflared` binary lifecycle with fallback command executing on non-matching host environments.
+  - Integrated WorkManager `TtlCheckWorker` to poll session TTL, automatically expiring sessions and tearing down processes upon TTL reaching 0.
+  - Written comprehensive Robolectric test suite `TunnelLifecycleManagerTest` validating correct process execution and termination, TTL expiration flows, and process restart/low-memory resets.
+
 ## [1.1.0] - 2026-07-07
 
 ### Added
