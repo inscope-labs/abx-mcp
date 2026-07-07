@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.core.tunnel"
+    namespace = "com.inscopelabs.abxmcp.core.tunnel"
     compileSdk = 36
 
     defaultConfig {
