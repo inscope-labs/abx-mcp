@@ -1,3 +1,60 @@
 <resources>
     <string name="app_name">ABC Server</string>
+    <string name="title_enrollment">ABC Server Enrollment</string>
+    
+    <!-- Sections -->
+    <string name="section_device_identity">Device Identity</string>
+    <string name="section_verification">Verification</string>
+    <string name="section_security_status">Security Status</string>
+    <string name="section_enclave_actions">Hardware-Backed Actions</string>
+    
+    <!-- Device Identity -->
+    <string name="label_fingerprint_title">Device Fingerprint (SHA-256)</string>
+    <string name="btn_copy_fingerprint">Copy fingerprint</string>
+    <string name="btn_view_full">View Full Fingerprint</string>
+    <string name="btn_hide_full">Hide Full Fingerprint</string>
+    <string name="msg_fingerprint_copied">Fingerprint copied to clipboard</string>
+    
+    <!-- Verification -->
+    <string name="label_scan_to_enroll">Scan to Enroll Device</string>
+    <string name="desc_verification_instruction">Present this QR code to the gateway or server to enroll this secure device.</string>
+    
+    <!-- Security Status -->
+    <string name="label_hardware_enclave">Hardware Enclave Status</string>
+    <string name="label_provider_backend">Provider Backend</string>
+    <string name="label_key_isolation">Key Material Isolation</string>
+    <string name="label_hardware_backed">Hardware Backed (TEE)</string>
+    <string name="label_strongbox_support">StrongBox Support</string>
+    
+    <string name="val_android_keystore">Android KeyStore (Hardware Secured)</string>
+    <string name="val_jvm_sandbox">JVM Sandbox (Test Environment)</string>
+    <string name="val_key_isolation_text">NON-EXPORTABLE (Private key locked in HSM)</string>
+    <string name="val_hardware_backed_yes">YES (Cryptographic actions restricted to chip)</string>
+    <string name="val_hardware_backed_no">NO (TEE fallback unavailable)</string>
+    <string name="val_strongbox_yes">YES (Discrete Hardware Security Module)</string>
+    
+    <!-- Actions -->
+    <string name="btn_rotate_key">Rotate Secure Keypair</string>
+    <string name="btn_clear_credentials">Clear Credentials &amp; Deconstruct Identity</string>
+    <string name="msg_keys_cleared">Secure keys successfully cleared and deconstructed.</string>
+    <string name="msg_rotated_success">New EC-256 device credential keypair rotated successfully.</string>
+    <string name="msg_secure_active">Secure keypair active.</string>
+    <string name="msg_init_failed">Credential initialization failed: %1$s</string>
+    
+    <!-- About / Help dialog -->
+    <string name="btn_about_info">About &amp; Privacy Policy</string>
+    <string name="dialog_about_title">About ABC Server</string>
+    <string name="dialog_about_version">Version 4.0</string>
+    <string name="dialog_about_spec">Architecture: Specification v3.0</string>
+    <string name="dialog_about_support">Support Email: afterdawn.service@gmail.com</string>
+    <string name="dialog_about_privacy_title">Privacy Policy</string>
+    <string name="dialog_about_privacy_text">ABC Server operates offline and locally on your device. It does NOT collect, harvest, or transmit any user-identifiable information, usage statistics, or location data. All generated cryptographic keys are isolated and secured inside the device\'s Hardware Security Module (HSM) / Secure Enclave and cannot be exported or accessed by external applications.</string>
+    <string name="dialog_about_terms_title">Terms of Service</string>
+    <string name="dialog_about_terms_text">This utility is provided \"as is\" to facilitate secure, hardware-attested authentication. You are responsible for ensuring your physical device security.</string>
+    <string name="btn_close">Close</string>
+    
+    <!-- Error/Empty State -->
+    <string name="error_state_title">Secure Identity Initialization Failed</string>
+    <string name="error_state_desc">The application was unable to establish a secure, hardware-backed identity key pair. This might occur if hardware cryptography is restricted or the secure enclave is temporarily locked.</string>
+    <string name="btn_retry_initialization">Retry Initialization</string>
 </resources>

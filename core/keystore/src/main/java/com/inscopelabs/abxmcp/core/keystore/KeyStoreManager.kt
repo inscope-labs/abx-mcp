@@ -190,4 +190,26 @@ class KeyStoreManager(
             return inMemoryKeys[alias]?.private
         }
     }
+
+    /**
+     * Deletes the key pair and associated certificates from Android Keystore or in-memory fallback.
+     */
+    fun deleteKeyPair(alias: String): Boolean {
+        return if (isAndroidKeyStore && keyStore != null) {
+            try {
+                if (keyStore.containsAlias(alias)) {
+                    keyStore.deleteEntry(alias)
+                    true
+                } else {
+                    false
+                }
+            } catch (e: Exception) {
+                false
+            }
+        } else {
+            val removedKey = inMemoryKeys.remove(alias) != null
+            inMemoryChains.remove(alias)
+            removedKey
+        }
+    }
 }
