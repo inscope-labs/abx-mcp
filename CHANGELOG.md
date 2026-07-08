@@ -2,6 +2,15 @@
 
 All notable changes to the ABX-MCP security architecture client will be documented in this file.
 
+## [1.3.0] - 2026-07-07
+
+### Added
+- **Phase 4: Capability Token Issuer and Replay Protection**:
+  - Implemented `TokenIssuer` and `TokenIssuerImpl` in `:core:keystore` generating JWT-like signed tokens (Base64 URL-safe JSON structures appended with elliptic curve ECDSA SHA256 signatures).
+  - Added key-unwrapping fallback using reflection to cleanly extract JVM-fallback keys during non-exportable key execution under Robolectric.
+  - Implemented `ReplayProtection` and `ReplayProtectionImpl` in `:core:session` ensuring thread-safe in-memory sliding-window checks (including configurable boundary limits) and strict state pre-check verification.
+  - Created a robust JUnit/Robolectric test suite `ReplayAndTokenProtectionTest` verifying token tampering rejection, replay detection, timestamp boundary validations, and correct ordering of state-pre-checks.
+
 ## [1.2.0] - 2026-07-07
 
 ### Added
