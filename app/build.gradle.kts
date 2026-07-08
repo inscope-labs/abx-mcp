@@ -137,6 +137,10 @@ dependencies {
   implementation(project(":core:keystore"))
   implementation(project(":core:session"))
   implementation(project(":core:tunnel"))
+  implementation(project(":core:policy"))
+  implementation(project(":core:mcp"))
+  implementation(project(":core:filesystem"))
+  implementation(project(":core:audit"))
 }
 
 tasks.withType<Test> {

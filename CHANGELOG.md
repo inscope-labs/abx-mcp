@@ -2,6 +2,15 @@
 
 All notable changes to the ABX-MCP security architecture client will be documented in this file.
 
+## [1.4.0] - 2026-07-07
+
+### Added
+- **Phase 5: Policy Engine and Raw Filesystem Authorization**:
+  - Implemented `PolicyEngine` and `PolicyEngineImpl` in `:core:policy` validating user request paths against capability-signed roots and checking operation granularity.
+  - Implemented complete file-system canonicalization using `java.io.File.canonicalPath` to resolve path traversals (`../`) and symbolic links.
+  - Added Unicode normalization (using `java.text.Normalizer` Form NFC) to compare requested paths and allowed roots across different decomposition standards (NFC vs. NFD).
+  - Implemented a complete JUnit test suite (`PolicyEngineTest`) verifying path traversal escapes, symlink sandbox bypasses, Unicode Normalization equivalence, operation granularity constraints, and session pre-check validation rules.
+
 ## [1.3.0] - 2026-07-07
 
 ### Added
