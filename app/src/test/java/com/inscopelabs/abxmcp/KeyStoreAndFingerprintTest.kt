@@ -1,10 +1,12 @@
 package com.inscopelabs.abxmcp
 
 import android.content.Context
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.test.core.app.ApplicationProvider
 import com.inscopelabs.abxmcp.core.keystore.FingerprintUtils
+import com.inscopelabs.abxmcp.core.keystore.KeyStoreEnvironment
 import com.inscopelabs.abxmcp.core.keystore.KeyStoreManager
 import org.junit.Assert.*
 import org.junit.Before
@@ -24,7 +26,57 @@ class KeyStoreAndFingerprintTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        keyStoreManager = KeyStoreManager(context)
+        keyStoreManager = KeyStoreManager(context, KeyStoreEnvironment.TEST_FALLBACK)
+    }
+
+    @Test
+    fun testPrivateKey_reflectionUnwrap_fails() {
+        val alias = "test_reflection_alias"
+        keyStoreManager.generateKeyPair(alias)
+        val privateKey = keyStoreManager.getPrivateKeyForTest(alias)!!
+
+        // Attempt the same reflective field access that TokenIssuerImpl used to do
+        var reflectionSucceeded = false
+        try {
+            val field = privateKey.javaClass.getDeclaredField("delegate")
+            field.isAccessible = true
+            val unwrappedKey = field.get(privateKey) as java.security.PrivateKey
+            reflectionSucceeded = true
+        } catch (e: Exception) {
+            // Expected to fail on the corrected implementation
+        }
+
+        assertFalse("Reflection unwrap must fail to prevent extracting raw private key bytes", reflectionSucceeded)
+    }
+
+    @Test
+    fun testKeyStoreEnvironment_productionMode_ignoresHardwareSniffing() {
+        val originalHardware = Build.HARDWARE
+        val originalFingerprint = Build.FINGERPRINT
+        try {
+            org.robolectric.util.ReflectionHelpers.setStaticField(Build::class.java, "HARDWARE", "goldfish")
+            org.robolectric.util.ReflectionHelpers.setStaticField(Build::class.java, "FINGERPRINT", "robolectric")
+
+            // Forced to PRODUCTION/device mode
+            val productionManager = KeyStoreManager(context, KeyStoreEnvironment.PRODUCTION)
+
+            // Ensure that isAndroidKeyStore behaves exactly according to AndroidKeyStore availability,
+            // ignoring Build.HARDWARE "goldfish" and Build.FINGERPRINT "robolectric".
+            val expectedIsAndroidKeyStore = try {
+                java.security.KeyStore.getInstance("AndroidKeyStore") != null
+            } catch (e: Exception) {
+                false
+            }
+
+            assertEquals(
+                "In PRODUCTION mode, isAndroidKeyStore must match KeyStore availability, ignoring fingerprint/hardware sniffing",
+                expectedIsAndroidKeyStore,
+                productionManager.isAndroidKeyStore
+            )
+        } finally {
+            org.robolectric.util.ReflectionHelpers.setStaticField(Build::class.java, "HARDWARE", originalHardware)
+            org.robolectric.util.ReflectionHelpers.setStaticField(Build::class.java, "FINGERPRINT", originalFingerprint)
+        }
     }
 
     @Test

@@ -19,13 +19,17 @@ import kotlinx.coroutines.launch
 
 class TunnelService : Service() {
 
-    private val serviceScope = CoroutineScope(Dispatchers.Default)
+    private val defaultScope = CoroutineScope(Dispatchers.Default)
+    private val serviceJob = kotlinx.coroutines.SupervisorJob()
+    private lateinit var serviceScope: CoroutineScope
     private lateinit var tunnelManager: TunnelManager
 
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "tunnel_service_channel"
         private const val CHANNEL_NAME = "Tunnel Service Channel"
+
+        var testScope: CoroutineScope? = null
 
         fun start(context: Context) {
             val intent = Intent(context, TunnelService::class.java)
@@ -44,35 +48,72 @@ class TunnelService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        val baseScope = testScope ?: defaultScope
+        serviceScope = CoroutineScope(baseScope.coroutineContext + serviceJob)
+
         tunnelManager = TunnelManagerProvider.get(this)
         createNotificationChannel()
 
-        val notification = createNotification()
+        val initialNotification = createNotificationForState(tunnelManager.stateFlow.value)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(
                     NOTIFICATION_ID,
-                    notification,
+                    initialNotification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                 )
             } else {
                 startForeground(
                     NOTIFICATION_ID,
-                    notification,
+                    initialNotification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE
                 )
             }
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            startForeground(NOTIFICATION_ID, initialNotification)
         }
 
-        // Start observing session state to self-stop if inactive
+        // Start observing tunnel running state to update notification live
+        serviceScope.launch {
+            tunnelManager.stateFlow.collect { state ->
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val notification = createNotificationForState(state)
+                notificationManager.notify(NOTIFICATION_ID, notification)
+            }
+        }
+
+        // Start observing session state to self-stop if inactive and run countdown when active
         val sessionManager = SessionManagerProvider.get(this)
         serviceScope.launch {
             sessionManager.stateFlow.collect { state ->
                 if (state !is SessionState.ACTIVE) {
                     stopSelf()
+                } else {
+                    startCountdown(sessionManager)
                 }
+            }
+        }
+    }
+
+    private var countdownJob: kotlinx.coroutines.Job? = null
+
+    private fun startCountdown(sessionManager: com.inscopelabs.abxmcp.core.session.SessionManager) {
+        countdownJob?.cancel()
+        countdownJob = serviceScope.launch {
+            while (sessionManager.getState() is SessionState.ACTIVE) {
+                val remainingTtl = sessionManager.getSessionTtl()
+                if (remainingTtl <= 0) {
+                    try {
+                        sessionManager.expireSession()
+                    } catch (e: Exception) {
+                        // Ignore
+                    }
+                    tunnelManager.stopTunnel()
+                    stopSelf()
+                    break
+                }
+                kotlinx.coroutines.delay(1000)
+                sessionManager.decrementTtl(1)
             }
         }
     }
@@ -85,7 +126,10 @@ class TunnelService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         tunnelManager.stopTunnel()
-        serviceScope.cancel()
+        serviceJob.cancel()
+        if (testScope == null) {
+            defaultScope.cancel()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -106,10 +150,15 @@ class TunnelService : Service() {
         }
     }
 
-    private fun createNotification(): Notification {
+    private fun createNotificationForState(state: TunnelState): Notification {
+        val (title, text) = when (state) {
+            TunnelState.RUNNING -> Pair("ABX-MCP Tunnel Active", "The secure hardware-backed tunnel is active.")
+            TunnelState.UNAVAILABLE -> Pair("ABX-MCP Tunnel Unavailable", "The secure tunnel is unavailable on this device.")
+            TunnelState.STOPPED -> Pair("ABX-MCP Tunnel Stopped", "The secure tunnel is stopped.")
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("ABX-MCP Tunnel Active")
-            .setContentText("The secure hardware-backed tunnel is active.")
+            .setContentTitle(title)
+            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_secure)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

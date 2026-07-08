@@ -16,7 +16,8 @@ class TtlCheckWorker(
         val sessionManager = SessionManagerProvider.get(applicationContext)
         val tunnelManager = TunnelManagerProvider.get(applicationContext)
 
-        while (sessionManager.getState() is SessionState.ACTIVE) {
+        if (sessionManager.getState() is SessionState.ACTIVE) {
+            sessionManager.decrementTtl(1)
             val remainingTtl = sessionManager.getSessionTtl()
             if (remainingTtl <= 0) {
                 try {
@@ -25,11 +26,7 @@ class TtlCheckWorker(
                     // Ignore if state has already changed
                 }
                 tunnelManager.stopTunnel()
-                return Result.success()
             }
-
-            delay(1000)
-            sessionManager.decrementTtl(1)
         }
 
         return Result.success()

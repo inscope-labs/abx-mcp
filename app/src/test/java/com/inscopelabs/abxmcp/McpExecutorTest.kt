@@ -341,4 +341,90 @@ class McpExecutorTest {
         assertNotEquals("The version string should be updated after modification", version1, version2)
         assertEquals(newLastMod.toString(), version2)
     }
+
+    /**
+     * A content:// path is cleanly and consistently rejected end-to-end.
+     * PolicyEngine rejects it before any FileSystemReader interaction,
+     * ensuring that PolicyEngine and FileSystemReader never disagree on executed path forms.
+     */
+    @Test
+    fun testContentUri_IsCleanlyAndConsistentlyRejected() {
+        val path = "content://com.example.provider/docs/1"
+        val req = JSONObject().apply {
+            put("method", "read_file")
+            put("params", JSONObject().apply {
+                put("path", path)
+            })
+        }.toString()
+
+        val respStr = mcpExecutor.execute(req, activeToken, SessionState.ACTIVE)
+        val resp = JSONObject(respStr)
+
+        assertTrue("Should return error for rejected path", resp.getBoolean("isError"))
+        val contentArr = resp.getJSONArray("content")
+        val errorText = contentArr.getJSONObject(0).getString("text")
+        assertTrue("Error should be due to authorization rejection", errorText.contains("Authorization rejected"))
+        assertTrue("Reason should name non-file schemes rejection", errorText.contains("Non-file schemes (such as content://) are explicitly rejected"))
+    }
+
+    /**
+     * Symlink TOCTOU test:
+     * 1. Authorize a symlink path via PolicyEngine to get its authorized canonical path.
+     * 2. Swap the symlink target (point it to a restricted/unauthorized target, e.g. secret.txt).
+     * 3. Execute the read using the originally-authorized canonical path.
+     * 4. Assert that the read still accesses the original canonical target (or fails closed)
+     *    and does NOT read from the swapped/restricted target.
+     */
+    @Test
+    fun testSymlinkTOCTOU_RespectsOriginalCanonicalTarget() {
+        val rootDir = File(tempDir.toFile(), "files")
+        val originalTarget = File(rootDir, "original.txt").apply { writeText("original content") }
+        val secretTarget = File(tempDir.toFile(), "secret_unauthorized.txt").apply { writeText("secret password!") }
+
+        val symlinkFile = File(rootDir, "toctou_link")
+        try {
+            Files.createSymbolicLink(symlinkFile.toPath(), originalTarget.toPath())
+        } catch (e: Exception) {
+            System.err.println("Symlinks not supported: ${e.message}")
+            return // Skip if OS doesn't support symlinks under test
+        }
+
+        // Token authorizes the root directory (which allows original.txt but NOT secret_unauthorized.txt)
+        val testToken = Capability(
+            sessionId = "session_toctou",
+            expiry = System.currentTimeMillis() + 60000L,
+            allowedOperations = listOf("read_file"),
+            allowedRoots = listOf(rootDir.absolutePath),
+            nonceSeed = "seed_123"
+        )
+
+        // 1. Authorize the symlink path
+        val request = com.inscopelabs.abxmcp.core.policy.Request(
+            path = symlinkFile.absolutePath,
+            operation = "read_file"
+        )
+        val authResult = policyEngine.authorize(request, testToken, SessionState.ACTIVE)
+        assertTrue(authResult is com.inscopelabs.abxmcp.core.policy.AuthorizationResult.Allowed)
+        val authorizedCanonicalPath = (authResult as com.inscopelabs.abxmcp.core.policy.AuthorizationResult.Allowed).canonicalPath
+
+        // Verify the resolved canonical path points to originalTarget
+        assertEquals(originalTarget.canonicalPath, authorizedCanonicalPath)
+
+        // 2. TOCTOU Swap: delete symlink and recreate it pointing to the unauthorized secret
+        symlinkFile.delete()
+        Files.createSymbolicLink(symlinkFile.toPath(), secretTarget.toPath())
+
+        // 3. Perform read using the originally-authorized canonical path
+        val readBytes = try {
+            fileSystemReader.readFile(authorizedCanonicalPath)
+        } catch (e: Exception) {
+            null
+        }
+
+        // 4. Assert that the read STILL reads the original target, NOT the swapped secret target.
+        assertNotNull(readBytes)
+        val content = String(readBytes!!, Charsets.UTF_8)
+        assertEquals("original content", content)
+        assertNotEquals("secret password!", content)
+    }
 }

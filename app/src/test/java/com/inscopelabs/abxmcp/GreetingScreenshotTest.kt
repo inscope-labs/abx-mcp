@@ -22,7 +22,7 @@ class GreetingScreenshotTest {
   @Test
   fun greeting_screenshot() {
     val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
-    val keyStoreManager = com.inscopelabs.abxmcp.core.keystore.KeyStoreManager(context)
+    val keyStoreManager = com.inscopelabs.abxmcp.core.keystore.KeyStoreManager(context, com.inscopelabs.abxmcp.core.keystore.KeyStoreEnvironment.TEST_FALLBACK)
     
     composeTestRule.setContent { 
       MyApplicationTheme { 

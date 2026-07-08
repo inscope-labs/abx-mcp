@@ -16,7 +16,7 @@ data class Capability(
 )
 
 sealed class AuthorizationResult {
-    object Allowed : AuthorizationResult()
+    data class Allowed(val canonicalPath: String) : AuthorizationResult()
     data class Rejected(val reason: String) : AuthorizationResult()
 }
 

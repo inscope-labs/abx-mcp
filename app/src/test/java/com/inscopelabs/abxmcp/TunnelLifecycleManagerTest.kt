@@ -39,7 +39,11 @@ class TunnelLifecycleManagerTest {
         sessionManager = SessionManagerImpl()
         SessionManagerProvider.setForTesting(sessionManager)
         
-        tunnelManager = TunnelManagerImpl(context, sessionManager)
+        tunnelManager = TunnelManagerImpl(
+            context,
+            sessionManager,
+            com.inscopelabs.abxmcp.core.tunnel.TunnelEnvironment.TEST_AVAILABLE
+        )
         TunnelManagerProvider.setForTesting(tunnelManager)
     }
 
@@ -121,5 +125,92 @@ class TunnelLifecycleManagerTest {
         } catch (e: Exception) {
             false
         }
+    }
+
+    @Test
+    fun testNoValidBinaryPresent_ReportsUnavailable() {
+        val unavailableTunnelManager = TunnelManagerImpl(
+            context,
+            sessionManager,
+            com.inscopelabs.abxmcp.core.tunnel.TunnelEnvironment.TEST_UNAVAILABLE
+        )
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        val started = unavailableTunnelManager.startTunnel()
+        assertFalse("Should fail to start when binary is unavailable", started)
+        assertEquals(com.inscopelabs.abxmcp.core.tunnel.TunnelState.UNAVAILABLE, unavailableTunnelManager.stateFlow.value)
+        assertFalse(unavailableTunnelManager.isRunningFlow.value)
+    }
+
+    @Test
+    fun testValidTestDoubleBinary_ReportsActiveNotification() = runTest {
+        // Setup service testScope seam
+        com.inscopelabs.abxmcp.core.tunnel.TunnelService.testScope = this
+        
+        val activeTunnelManager = TunnelManagerImpl(
+            context,
+            sessionManager,
+            com.inscopelabs.abxmcp.core.tunnel.TunnelEnvironment.TEST_AVAILABLE
+        )
+        TunnelManagerProvider.setForTesting(activeTunnelManager)
+
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        
+        // Start TunnelService using Robolectric
+        val serviceController = org.robolectric.Robolectric.buildService(com.inscopelabs.abxmcp.core.tunnel.TunnelService::class.java).create().startCommand(0, 0)
+        
+        assertTrue("isRunningFlow must be true", activeTunnelManager.isRunningFlow.value)
+        assertEquals(com.inscopelabs.abxmcp.core.tunnel.TunnelState.RUNNING, activeTunnelManager.stateFlow.value)
+
+        // Verify active notification
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val activeNotifications = notificationManager.activeNotifications
+        
+        assertTrue("Should have posted at least one notification", activeNotifications.isNotEmpty())
+        val notification = activeNotifications.first().notification
+        
+        val title = notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()
+        val text = notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString()
+        
+        assertEquals("ABX-MCP Tunnel Active", title)
+        assertEquals("The secure hardware-backed tunnel is active.", text)
+        
+        // Clean up
+        serviceController.destroy()
+        com.inscopelabs.abxmcp.core.tunnel.TunnelService.testScope = null
+    }
+
+    @Test
+    fun testLongTtlExpiryServiceCountdown() = runTest {
+        // Use virtual test scope to bypass real delays
+        com.inscopelabs.abxmcp.core.tunnel.TunnelService.testScope = this
+        
+        val activeTunnelManager = TunnelManagerImpl(
+            context,
+            sessionManager,
+            com.inscopelabs.abxmcp.core.tunnel.TunnelEnvironment.TEST_AVAILABLE
+        )
+        TunnelManagerProvider.setForTesting(activeTunnelManager)
+
+        // Set TTL above 10-minute WorkManager execution ceiling (e.g. 700 seconds)
+        sessionManager.setSessionTtl(700)
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        
+        // Start TunnelService using Robolectric
+        val serviceController = org.robolectric.Robolectric.buildService(com.inscopelabs.abxmcp.core.tunnel.TunnelService::class.java).create().startCommand(0, 0)
+        
+        assertEquals(SessionState.ACTIVE, sessionManager.getState())
+        assertTrue(activeTunnelManager.isTunnelRunning())
+
+        // Advance time by 700 seconds (700000 ms) in virtual scheduler
+        testScheduler.advanceTimeBy(700000)
+        testScheduler.runCurrent()
+
+        // Verify that session state has transitioned to EXPIRED, the tunnel is stopped and the service self-stops
+        assertEquals("Session state must be EXPIRED upon TTL hit 0", SessionState.EXPIRED, sessionManager.getState())
+        assertFalse("Tunnel must be stopped", activeTunnelManager.isTunnelRunning())
+
+        // Clean up
+        serviceController.destroy()
+        com.inscopelabs.abxmcp.core.tunnel.TunnelService.testScope = null
     }
 }

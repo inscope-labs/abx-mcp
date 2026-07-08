@@ -2,6 +2,32 @@
 
 All notable changes to the ABX-MCP security architecture client will be documented in this file.
 
+## [1.5.0] - 2026-07-08
+
+### Added
+- **Phase 6.4: Path Semantics & Replay Hardening Remediation**:
+  - Modified `PolicyEngineImpl` to explicitly reject any non-file-scheme paths (such as `content://` URIs or other schemes containing `://`) with a clear, named rejection reason to avoid silent mis-canonicalization.
+  - Refactored `AuthorizationResult.Allowed` to carry the verified canonical path of the request resolved by the policy engine.
+  - Resolved the check-then-use (TOCTOU) vulnerability in `McpExecutor` by extracting the authorized canonical path from the authorization result and threading that exact path to all subsequent `FileSystemReader` operations.
+  - Hardened `ReplayProtectionImpl` by migrating `seenNonces` to a synchronized timestamp-backed hash map and implementing opportunistic eviction of nonces older than `windowSizeMs` during each validation request to prevent unbounded memory growth.
+  - Implemented unit and integration tests verifying clean content URI rejection, symlink TOCTOU protection under target swapping, and bounded nonce memory growth under sustained load.
+- **Phase 6.3: Tunnel Lifecycle Truthfulness Remediation**:
+  - Eliminated the silent fallback logic in production that falsely claimed the tunnel was running when the real binary was missing.
+  - Implemented real binary verification on `libcloudflared.so` using ELF magic number header checks (`0x7F 'E' 'L' 'F'`), returning a robust `TunnelState.UNAVAILABLE` when the files are placeholders.
+  - Refactored `TunnelManager` and `TunnelManagerImpl` to expose `stateFlow: StateFlow<TunnelState>` and accept an injectable `TunnelEnvironment` test seam to dynamically toggle binary availability under test scenarios.
+  - Replaced the vulnerable WorkManager countdown delay loop (which was subject to the 10-minute ceiling limit) with a lifecycle-bound coroutine countdown in `TunnelService`, enabling correct session expiration for long-lived TTLs.
+  - Modified the Foreground Notification inside `TunnelService` to reactively update its content live based on `stateFlow` updates, showing "Tunnel Active", "Tunnel Stopped", or "Tunnel Unavailable".
+  - Created JUnit/Robolectric test cases verifying `Unavailable` behavior, live notifications, and long-TTL virtual clock countdowns.
+- **Phase 6.2: Session State Correctness Remediation**:
+  - Fixed `SessionManagerImpl.startSession()` so that every valid transition into the `ACTIVE` state resets `ttlSeconds` to the default configured value (300 seconds), correcting the bug where a new session started after a prior `EXPIRED` session would inherit a stale or zeroed TTL.
+  - Resolved `UserGesture.NotificationAction` dead-end gesture type by changing the `SessionManager` public interface to add a legitimate state transition method `extendSession()`. This allows `NotificationAction` to extend an already `ACTIVE` session's TTL (adding the extension seconds), while keeping starting/activation transitions restricted strictly to `LocalButtonPress`.
+  - Added new robust unit tests in `SessionManagerTest` verifying that reactivating an expired session correctly resets the TTL, and that `NotificationAction` successfully extends an active session but is rejected for starting a session.
+- **Phase 6.1: Keystore & Attestation Integrity Remediation**:
+  - Removed the reflection-based key unwrapping in `TokenIssuerImpl` entirely, allowing signing to occur through the key object interface as exposed by `KeyStoreManager`.
+  - Replaced runtime `Build.FINGERPRINT` and `Build.HARDWARE` sniffing with an explicit, injectable `KeyStoreEnvironment` test seam parameter in `KeyStoreManager`.
+  - Rewrote `NonExportablePrivateKey` to execute signatures using an encapsulated lambda/closure, eliminating the private `delegate` key field to prevent reflective extraction of private key materials.
+  - Added JUnit/Robolectric test cases in `KeyStoreAndFingerprintTest` verifying that reflective unwrap attempts fail to extract usable keys and that the production path behaves independently of build fields.
+
 ## [1.4.0] - 2026-07-07
 
 ### Added

@@ -63,19 +63,22 @@ class McpExecutor(
             // 1. Policy Engine Authorization pre-check!
             val policyReq = PolicyRequest(path = path, operation = operation)
             val authResult = policyEngine.authorize(policyReq, token, currentState)
-            if (authResult is AuthorizationResult.Rejected) {
-                return errorResponse(reqId, "Authorization rejected: ${authResult.reason}", isMcpStyle = true)
+            val authorizedPath = when (authResult) {
+                is AuthorizationResult.Allowed -> authResult.canonicalPath
+                is AuthorizationResult.Rejected -> {
+                    return errorResponse(reqId, "Authorization rejected: ${authResult.reason}", isMcpStyle = true)
+                }
             }
 
             // 2. Execute requested operation
             val resultObj = JSONObject()
             when (operation) {
                 "file_exists" -> {
-                    val exists = fileSystemReader.exists(path)
+                    val exists = fileSystemReader.exists(authorizedPath)
                     resultObj.put("exists", exists)
                 }
                 "get_file_metadata" -> {
-                    val metadata = fileSystemReader.getMetadata(path)
+                    val metadata = fileSystemReader.getMetadata(authorizedPath)
                     if (metadata != null) {
                         resultObj.put("name", metadata.name)
                         resultObj.put("path", metadata.path)
@@ -85,16 +88,16 @@ class McpExecutor(
                         resultObj.put("isFile", metadata.isFile)
                         resultObj.put("mimeType", metadata.mimeType)
                     } else {
-                        return errorResponse(reqId, "File not found: $path", isMcpStyle = true)
+                        return errorResponse(reqId, "File not found: $authorizedPath", isMcpStyle = true)
                     }
                 }
                 "get_file_version" -> {
-                    val lastMod = fileSystemReader.getLastModified(path)
+                    val lastMod = fileSystemReader.getLastModified(authorizedPath)
                     resultObj.put("version", lastMod.toString())
                 }
                 "read_file" -> {
                     val encoding = paramsObj.optString("encoding", "text")
-                    val bytes = fileSystemReader.readFile(path)
+                    val bytes = fileSystemReader.readFile(authorizedPath)
                     if (encoding == "base64" || encoding == "binary") {
                         val base64Str = Base64.encodeToString(bytes, Base64.NO_WRAP)
                         resultObj.put("content", base64Str)
@@ -106,7 +109,7 @@ class McpExecutor(
                     }
                 }
                 "list_directory" -> {
-                    val files = fileSystemReader.listDirectory(path)
+                    val files = fileSystemReader.listDirectory(authorizedPath)
                     val filesArray = JSONArray(files)
                     resultObj.put("files", filesArray)
                 }

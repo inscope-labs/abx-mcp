@@ -28,23 +28,15 @@ class TokenIssuerImpl(private val keyStoreManager: KeyStoreManager) : TokenIssue
         val keyPair = keyStoreManager.getOrCreateKeyPair(alias)
         val privateKey = keyPair.private
 
-        val realPrivateKey = if (privateKey.javaClass.simpleName == "NonExportablePrivateKey") {
-            try {
-                val field = privateKey.javaClass.getDeclaredField("delegate")
-                field.isAccessible = true
-                field.get(privateKey) as java.security.PrivateKey
-            } catch (e: Exception) {
-                privateKey
-            }
-        } else {
-            privateKey
-        }
-
         // Sign the payload base64 string
-        val signature = Signature.getInstance("SHA256withECDSA")
-        signature.initSign(realPrivateKey)
-        signature.update(payloadBase64.toByteArray(Charsets.UTF_8))
-        val sigBytes = signature.sign()
+        val sigBytes = if (privateKey is NonExportablePrivateKey) {
+            privateKey.sign(payloadBase64.toByteArray(Charsets.UTF_8))
+        } else {
+            val signature = Signature.getInstance("SHA256withECDSA")
+            signature.initSign(privateKey)
+            signature.update(payloadBase64.toByteArray(Charsets.UTF_8))
+            signature.sign()
+        }
         val sigBase64 = Base64.encodeToString(sigBytes, Base64.NO_WRAP or Base64.URL_SAFE)
 
         return "$payloadBase64.$sigBase64"

@@ -113,6 +113,43 @@ class SessionManagerTest {
     }
 
     @Test
+    fun testReactivateExpiredSessionResetsTtl() {
+        // Start session and set TTL to 0 to simulate expiration
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        sessionManager.setSessionTtl(0)
+        sessionManager.expireSession()
+
+        // Start session again after prior EXPIRED session
+        val started = sessionManager.startSession(UserGesture.LocalButtonPress)
+        assertTrue(started)
+        
+        // Stale TTL would be 0 or inherited from prior session. Default TTL should be 300.
+        assertEquals("Reactivated session must reset the TTL to the default value (300)", 300, sessionManager.getSessionTtl())
+    }
+
+    @Test
+    fun testNotificationActionExtendsActiveSessionButCannotStartSession() {
+        // Confirm NotificationAction cannot start a session from INACTIVE
+        val startedFromInactive = sessionManager.startSession(UserGesture.NotificationAction)
+        assertFalse("NotificationAction cannot start a session from INACTIVE", startedFromInactive)
+
+        // Start session normally with LocalButtonPress
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        sessionManager.setSessionTtl(100)
+
+        // Try extending with an invalid or incorrect gesture (like local press if restricted, or we check notification)
+        // Let's extend with NotificationAction
+        val extended = (sessionManager as SessionManagerImpl).extendSession(UserGesture.NotificationAction, 150)
+        assertTrue("NotificationAction must successfully extend an ACTIVE session", extended)
+        assertEquals("TTL should be increased by extension duration", 250, sessionManager.getSessionTtl())
+
+        // Stop session and confirm NotificationAction cannot extend inactive session
+        sessionManager.stopSession()
+        val extendedInactive = (sessionManager as SessionManagerImpl).extendSession(UserGesture.NotificationAction, 150)
+        assertFalse("NotificationAction cannot extend an inactive session", extendedInactive)
+    }
+
+    @Test
     fun testTerminalState_RevokedCannotBeReactivated() {
         sessionManager.startSession(UserGesture.LocalButtonPress)
         sessionManager.revokeSession()

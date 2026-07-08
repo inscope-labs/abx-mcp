@@ -33,7 +33,7 @@ class ReplayAndTokenProtectionTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        keyStoreManager = KeyStoreManager(context)
+        keyStoreManager = KeyStoreManager(context, com.inscopelabs.abxmcp.core.keystore.KeyStoreEnvironment.TEST_FALLBACK)
         tokenIssuer = TokenIssuerImpl(keyStoreManager)
         
         sessionManager = SessionManagerImpl()
@@ -164,5 +164,38 @@ class ReplayAndTokenProtectionTest {
         // 4. Exactly 1ms outside negative boundary: currentTime - 30,001ms (Must reject)
         val resultOutLowerBoundary = replayProtection.validateRequest(Nonce("${nonceVal}_4"), currentTime - 30001L, currentTime)
         assertTrue("1ms outside lower boundary must be rejected", resultOutLowerBoundary is ValidationResult.OutsideTimestampWindow)
+    }
+
+    /**
+     * Sustained-load nonce test: submit nonces continuously across several multiples of windowSizeMs
+     * and assert seenNonces' size stays bounded rather than growing without limit.
+     */
+    @Test
+    fun testSustainedLoad_NonceSizeStaysBounded() {
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        assertEquals(SessionState.ACTIVE, sessionManager.getState())
+
+        val windowSize = 1000L
+        replayProtection.setWindowSizeMs(windowSize)
+
+        // Submit 100 nonces over multiple window sizes (total virtual time = 5 * windowSize)
+        val steps = 5
+        val noncesPerStep = 20
+        var virtualTime = System.currentTimeMillis()
+
+        for (step in 0 until steps) {
+            for (i in 0 until noncesPerStep) {
+                val nonce = Nonce("nonce_step_${step}_index_$i")
+                val res = replayProtection.validateRequest(nonce, virtualTime, virtualTime)
+                assertTrue(res is ValidationResult.Success)
+            }
+            // Advance virtual time by slightly more than windowSize
+            virtualTime += (windowSize + 100)
+        }
+
+        // After 5 steps, only the nonces from the last step should remain.
+        // Thus, the total seen nonces size must stay bounded (equal to noncesPerStep, or certainly much less than total 100).
+        val seenSize = replayProtection.getSeenNonces().size
+        assertTrue("Seen nonces size ($seenSize) should be bounded and much less than total 100", seenSize <= noncesPerStep)
     }
 }

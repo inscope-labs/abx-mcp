@@ -16,17 +16,22 @@ class PolicyEngineImpl : PolicyEngine {
             return AuthorizationResult.Rejected("Session is not active (current state: $currentState)")
         }
 
-        // 2. Check if the capability token itself has expired based on system clock
+        // 2. Reject any non-file schemes (e.g. content://)
+        if (request.path.startsWith("content://") || request.path.contains("://")) {
+            return AuthorizationResult.Rejected("Non-file schemes (such as content://) are explicitly rejected by PolicyEngine")
+        }
+
+        // 3. Check if the capability token itself has expired based on system clock
         if (System.currentTimeMillis() > token.expiry) {
             return AuthorizationResult.Rejected("Capability token has expired")
         }
 
-        // 3. Check operation granularity
+        // 4. Check operation granularity
         if (!token.allowedOperations.contains(request.operation)) {
             return AuthorizationResult.Rejected("Operation '${request.operation}' is not in allowed operations: ${token.allowedOperations}")
         }
 
-        // 4. Resolve the requested path canonical form
+        // 5. Resolve the requested path canonical form
         val canonicalReqPath = try {
             File(request.path).canonicalPath
         } catch (e: Exception) {
@@ -34,13 +39,13 @@ class PolicyEngineImpl : PolicyEngine {
         }
 
         val normalizedReqPath = Normalizer.normalize(canonicalReqPath, Normalizer.Form.NFC)
-        val cleanReq = if (normalizedReqPath.endsWith(File.separator)) {
+        val cleanReq = if (normalizedReqPath.endsWith(File.separator) && normalizedReqPath != File.separator) {
             normalizedReqPath.dropLast(1)
         } else {
             normalizedReqPath
         }
 
-        // 5. Compare against allowed roots
+        // 6. Compare against allowed roots
         var isAllowedPath = false
         for (root in token.allowedRoots) {
             val canonicalRootPath = try {
@@ -50,7 +55,7 @@ class PolicyEngineImpl : PolicyEngine {
             }
 
             val normalizedRootPath = Normalizer.normalize(canonicalRootPath, Normalizer.Form.NFC)
-            val cleanRoot = if (normalizedRootPath.endsWith(File.separator)) {
+            val cleanRoot = if (normalizedRootPath.endsWith(File.separator) && normalizedRootPath != File.separator) {
                 normalizedRootPath.dropLast(1)
             } else {
                 normalizedRootPath
@@ -67,6 +72,6 @@ class PolicyEngineImpl : PolicyEngine {
             return AuthorizationResult.Rejected("Path '${request.path}' (canonicalized: '$canonicalReqPath') is outside allowed roots: ${token.allowedRoots}")
         }
 
-        return AuthorizationResult.Allowed
+        return AuthorizationResult.Allowed(cleanReq)
     }
 }

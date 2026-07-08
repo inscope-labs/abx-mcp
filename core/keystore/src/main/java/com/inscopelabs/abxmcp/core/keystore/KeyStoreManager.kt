@@ -12,20 +12,36 @@ import java.security.PrivateKey
 import java.security.cert.Certificate
 import java.security.spec.ECGenParameterSpec
 
-class NonExportablePrivateKey(private val delegate: PrivateKey) : PrivateKey {
-    override fun getAlgorithm(): String = delegate.algorithm
-    override fun getFormat(): String? = null // Non-exportable keys have no export format
-    override fun getEncoded(): ByteArray? = null // Always null to prevent key material export
+enum class KeyStoreEnvironment {
+    PRODUCTION,
+    TEST_FALLBACK
 }
 
-class KeyStoreManager(private val context: Context) {
+class NonExportablePrivateKey(
+    private val algorithmName: String,
+    private val signHandler: (ByteArray) -> ByteArray
+) : PrivateKey {
+    override fun getAlgorithm(): String = algorithmName
+    override fun getFormat(): String? = null // Non-exportable keys have no export format
+    override fun getEncoded(): ByteArray? = null // Always null to prevent key material export
 
-    val isAndroidKeyStore: Boolean = try {
-        // Robolectric environment detection. We fall back to JVM mock inside tests for stability.
-        val isRobolectric = Build.FINGERPRINT == "robolectric" || Build.HARDWARE == "goldfish" || Build.HARDWARE == "ranchu"
-        KeyStore.getInstance("AndroidKeyStore") != null && !isRobolectric
-    } catch (e: Exception) {
-        false
+    fun sign(data: ByteArray): ByteArray {
+        return signHandler(data)
+    }
+}
+
+class KeyStoreManager(
+    private val context: Context,
+    private val environment: KeyStoreEnvironment = KeyStoreEnvironment.PRODUCTION
+) {
+
+    val isAndroidKeyStore: Boolean = when (environment) {
+        KeyStoreEnvironment.PRODUCTION -> try {
+            KeyStore.getInstance("AndroidKeyStore") != null
+        } catch (e: Exception) {
+            false
+        }
+        KeyStoreEnvironment.TEST_FALLBACK -> false
     }
 
     private val keyStore: KeyStore? = try {
@@ -99,7 +115,13 @@ class KeyStoreManager(private val context: Context) {
             val keyPairGenerator = KeyPairGenerator.getInstance("EC")
             keyPairGenerator.initialize(ECGenParameterSpec("secp256r1"))
             val keyPair = keyPairGenerator.generateKeyPair()
-            val wrappedPrivate = NonExportablePrivateKey(keyPair.private)
+            val rawPrivate = keyPair.private
+            val wrappedPrivate = NonExportablePrivateKey("EC") { data ->
+                val signature = java.security.Signature.getInstance("SHA256withECDSA")
+                signature.initSign(rawPrivate)
+                signature.update(data)
+                signature.sign()
+            }
             val finalKeyPair = KeyPair(keyPair.public, wrappedPrivate)
 
             inMemoryKeys[alias] = finalKeyPair

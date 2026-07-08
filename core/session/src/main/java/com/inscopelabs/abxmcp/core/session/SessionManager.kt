@@ -14,4 +14,5 @@ interface SessionManager {
     fun getSessionTtl(): Int
     fun setSessionTtl(seconds: Int)
     fun decrementTtl(amountSeconds: Int = 1): Int
+    fun extendSession(trigger: UserGesture, extensionSeconds: Int = 300): Boolean
 }

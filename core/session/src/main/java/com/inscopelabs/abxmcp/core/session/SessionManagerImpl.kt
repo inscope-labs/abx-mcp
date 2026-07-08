@@ -8,6 +8,7 @@ class SessionManagerImpl : SessionManager {
     private val _state = MutableStateFlow<SessionState>(SessionState.INACTIVE)
     override val stateFlow: StateFlow<SessionState> = _state.asStateFlow()
 
+    private var defaultTtlSeconds: Int = 300
     private var ttlSeconds: Int = 300
 
     override fun getState(): SessionState = _state.value
@@ -17,6 +18,9 @@ class SessionManagerImpl : SessionManager {
 
     @Synchronized
     override fun setSessionTtl(seconds: Int) {
+        if (_state.value !is SessionState.ACTIVE) {
+            defaultTtlSeconds = seconds
+        }
         ttlSeconds = seconds
     }
 
@@ -44,11 +48,24 @@ class SessionManagerImpl : SessionManager {
 
         // Legal transitions: INACTIVE -> ACTIVE, EXPIRED -> ACTIVE
         if (currentState is SessionState.INACTIVE || currentState is SessionState.EXPIRED) {
+            ttlSeconds = defaultTtlSeconds // Reset TTL to the configured default or explicitly supplied value
             _state.value = SessionState.ACTIVE
             return true
         }
 
         return false
+    }
+
+    @Synchronized
+    override fun extendSession(trigger: UserGesture, extensionSeconds: Int): Boolean {
+        if (_state.value !is SessionState.ACTIVE) {
+            return false
+        }
+        if (trigger !== UserGesture.NotificationAction) {
+            return false
+        }
+        ttlSeconds += extensionSeconds
+        return true
     }
 
     @Synchronized

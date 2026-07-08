@@ -4,11 +4,11 @@ import java.util.Collections
 
 class ReplayProtectionImpl(
     private val sessionManager: SessionManager,
-    private var windowSizeMs: Long = 30000L // default 30 seconds
+    @Volatile private var windowSizeMs: Long = 30000L // default 30 seconds
 ) : ReplayProtection {
 
-    private val seenNonces = Collections.synchronizedSet(HashSet<Nonce>())
-    private var lastTimestamp: Long = 0L
+    private val seenNoncesMap = HashMap<Nonce, Long>()
+    @Volatile private var lastTimestamp: Long = 0L
 
     override fun validateRequest(
         nonce: Nonce,
@@ -27,24 +27,41 @@ class ReplayProtectionImpl(
             return ValidationResult.OutsideTimestampWindow(diff)
         }
 
-        // 3. Nonce check: duplicate nonce check
-        if (seenNonces.contains(nonce)) {
-            return ValidationResult.DuplicateNonce
-        }
+        synchronized(seenNoncesMap) {
+            // 3. Nonce check: duplicate nonce check
+            if (seenNoncesMap.containsKey(nonce)) {
+                return ValidationResult.DuplicateNonce
+            }
 
-        // Add to seen nonces and update last timestamp
-        seenNonces.add(nonce)
-        lastTimestamp = timestampMs
+            // Add to seen nonces and update last timestamp
+            seenNoncesMap[nonce] = currentTimeMs
+            lastTimestamp = timestampMs
+
+            // Opportunistic eviction: evict nonces older than windowSizeMs
+            val iterator = seenNoncesMap.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (currentTimeMs - entry.value > windowSizeMs) {
+                    iterator.remove()
+                }
+            }
+        }
 
         return ValidationResult.Success
     }
 
     override fun reset() {
-        seenNonces.clear()
+        synchronized(seenNoncesMap) {
+            seenNoncesMap.clear()
+        }
         lastTimestamp = 0L
     }
 
-    override fun getSeenNonces(): Set<Nonce> = seenNonces.toSet()
+    override fun getSeenNonces(): Set<Nonce> {
+        synchronized(seenNoncesMap) {
+            return seenNoncesMap.keys.toSet()
+        }
+    }
 
     override fun getLastTimestamp(): Long = lastTimestamp
 
