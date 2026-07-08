@@ -5,17 +5,41 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
-
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Moshi Rules to prevent JSON deserialization failures under minification
+-keep class * {
+    @com.squareup.moshi.Json class *;
+    @com.squareup.moshi.JsonQualifier class *;
+}
+-keep class *JsonAdapter {
+    public <init>(com.squareup.moshi.Moshi);
+    public <init>(com.squareup.moshi.Moshi, java.lang.reflect.Type[]);
+}
+-keepclassmembers class * {
+    @com.squareup.moshi.Json *;
+}
+-keep class **_JsonAdapter { *; }
+
+# Retrofit Rules
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+-keepattributes AnnotationDefault
+-keepclassmembers,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+-dontwarn retrofit2.**
+
+# OkHttp Rules
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
+
+# Room Database Rules
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.limit.annotations.RestrictTo
+-keep class * extends androidx.room.migration.Migration
+-keep class * extends androidx.room.RoomDatabase$Callback

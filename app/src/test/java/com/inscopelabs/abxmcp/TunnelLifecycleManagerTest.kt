@@ -171,7 +171,7 @@ class TunnelLifecycleManagerTest {
         val title = notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()
         val text = notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString()
         
-        assertEquals("ABX-MCP Tunnel Active", title)
+        assertEquals("ABC Server Tunnel Active", title)
         assertEquals("The secure hardware-backed tunnel is active.", text)
         
         // Clean up

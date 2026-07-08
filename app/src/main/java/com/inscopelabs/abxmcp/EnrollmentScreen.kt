@@ -127,7 +127,7 @@ fun EnrollmentScreen(
                             modifier = Modifier.padding(end = 8.dp)
                         )
                         Text(
-                            text = "ABX-MCP Credential Enrollment",
+                            text = "ABC Server Credential Enrollment",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         )
@@ -297,7 +297,7 @@ fun EnrollmentScreen(
                             onClick = {
                                 if (fingerprint.isNotEmpty()) {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("ABX-MCP Public Key Fingerprint", fingerprint)
+                                    val clip = ClipData.newPlainText("ABC Server Public Key Fingerprint", fingerprint)
                                     clipboard.setPrimaryClip(clip)
                                     Toast.makeText(context, "Fingerprint copied to clipboard", Toast.LENGTH_SHORT).show()
                                 }

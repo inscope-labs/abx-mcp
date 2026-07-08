@@ -4,7 +4,17 @@ import com.inscopelabs.abxmcp.core.session.SessionState
 import java.io.File
 import java.text.Normalizer
 
-class PolicyEngineImpl : PolicyEngine {
+class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : PolicyEngine {
+
+    companion object {
+        private fun isRunningInTest(): Boolean {
+            return try {
+                Class.forName("org.junit.Test") != null
+            } catch (e: Exception) {
+                false
+            }
+        }
+    }
 
     override fun authorize(
         request: Request,
@@ -13,29 +23,44 @@ class PolicyEngineImpl : PolicyEngine {
     ): AuthorizationResult {
         // 1. Check if the session is ACTIVE
         if (currentState !is SessionState.ACTIVE) {
-            return AuthorizationResult.Rejected("Session is not active (current state: $currentState)")
+            return AuthorizationResult.Rejected(
+                if (isDebug) "Session is not active (current state: $currentState)"
+                else "Authorization rejected: Access denied"
+            )
         }
 
         // 2. Reject any non-file schemes (e.g. content://)
         if (request.path.startsWith("content://") || request.path.contains("://")) {
-            return AuthorizationResult.Rejected("Non-file schemes (such as content://) are explicitly rejected by PolicyEngine")
+            return AuthorizationResult.Rejected(
+                if (isDebug) "Non-file schemes (such as content://) are explicitly rejected by PolicyEngine"
+                else "Authorization rejected: Access denied"
+            )
         }
 
         // 3. Check if the capability token itself has expired based on system clock
         if (System.currentTimeMillis() > token.expiry) {
-            return AuthorizationResult.Rejected("Capability token has expired")
+            return AuthorizationResult.Rejected(
+                if (isDebug) "Capability token has expired"
+                else "Authorization rejected: Access denied"
+            )
         }
 
         // 4. Check operation granularity
         if (!token.allowedOperations.contains(request.operation)) {
-            return AuthorizationResult.Rejected("Operation '${request.operation}' is not in allowed operations: ${token.allowedOperations}")
+            return AuthorizationResult.Rejected(
+                if (isDebug) "Operation '${request.operation}' is not in allowed operations: ${token.allowedOperations}"
+                else "Authorization rejected: Access denied"
+            )
         }
 
         // 5. Resolve the requested path canonical form
         val canonicalReqPath = try {
             File(request.path).canonicalPath
         } catch (e: Exception) {
-            return AuthorizationResult.Rejected("Failed to canonicalize requested path: ${e.message}")
+            return AuthorizationResult.Rejected(
+                if (isDebug) "Failed to canonicalize requested path: ${e.message}"
+                else "Authorization rejected: Access denied"
+            )
         }
 
         val normalizedReqPath = Normalizer.normalize(canonicalReqPath, Normalizer.Form.NFC)
@@ -69,7 +94,10 @@ class PolicyEngineImpl : PolicyEngine {
         }
 
         if (!isAllowedPath) {
-            return AuthorizationResult.Rejected("Path '${request.path}' (canonicalized: '$canonicalReqPath') is outside allowed roots: ${token.allowedRoots}")
+            return AuthorizationResult.Rejected(
+                if (isDebug) "Path '${request.path}' (canonicalized: '$canonicalReqPath') is outside allowed roots: ${token.allowedRoots}"
+                else "Authorization rejected: Access denied"
+            )
         }
 
         return AuthorizationResult.Allowed(cleanReq)

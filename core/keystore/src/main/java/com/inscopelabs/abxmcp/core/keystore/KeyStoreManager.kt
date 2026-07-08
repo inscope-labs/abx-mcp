@@ -93,7 +93,7 @@ class KeyStoreManager(
 
             // Set attestation challenge to generate a hardware attestation chain on supported devices (API 24+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                builder.setAttestationChallenge("ABX-MCP-CHALLENGE".toByteArray())
+                builder.setAttestationChallenge("ABC-SERVER-CHALLENGE".toByteArray())
             }
 
             // Use StrongBox if supported on Android P+ (API 28+)
@@ -111,6 +111,9 @@ class KeyStoreManager(
             keyPairGenerator.initialize(builder.build())
             return keyPairGenerator.generateKeyPair()
         } else {
+            if (environment == KeyStoreEnvironment.PRODUCTION) {
+                throw IllegalStateException("Secure hardware-backed keystore is unavailable in production.")
+            }
             // JVM fallback for unit and Robolectric tests
             val keyPairGenerator = KeyPairGenerator.getInstance("EC")
             keyPairGenerator.initialize(ECGenParameterSpec("secp256r1"))

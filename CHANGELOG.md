@@ -1,10 +1,20 @@
 # Changelog
 
-All notable changes to the ABX-MCP security architecture client will be documented in this file.
+All notable changes to the ABC Server security client will be documented in this file.
 
 ## [1.5.0] - 2026-07-08
 
 ### Added
+- **Phase 6.6: Branding & Documentation Consistency**:
+  - Rebranded all user-facing strings, labels, and clipboard actions across `strings.xml`, `EnrollmentScreen`, `TunnelService` notifications/channels, and `KeyStoreManager` attestation challenges from "ABX-MCP" to "ABC Server".
+  - Completely rewrote `README.md` to serve as highly polished, professional documentation of ABC Server's architecture, modules, building steps, CI details, and development phase progression.
+  - Updated unit tests, platform `metadata.json`, and Gradle project settings to expect the rebranded app name and notification titles.
+- **Phase 6.5: Manifest & Permission Correctness**:
+  - Declared `android.permission.INTERNET` at the `:app` manifest level to enable necessary socket access for the hardware-backed tunnel process.
+  - Added a runtime `android.permission.POST_NOTIFICATIONS` permission request flow in `MainActivity` for devices running API 33+ (Android 13+), ensuring permission is requested before notifications are shown.
+  - Documented and verified graceful handling of denied notification cases inside `TunnelService` to guarantee the service still boots and functions as expected.
+  - Audited all modules' manifests, verifying that required foreground service permissions (`FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE`) are declared properly.
+  - Implemented unit and integration tests confirming the merged manifest contains the declared permissions and that the `POST_NOTIFICATIONS` runtime prompt is requested on API 33+ and correctly omitted on API 32 and below.
 - **Phase 6.4: Path Semantics & Replay Hardening Remediation**:
   - Modified `PolicyEngineImpl` to explicitly reject any non-file-scheme paths (such as `content://` URIs or other schemes containing `://`) with a clear, named rejection reason to avoid silent mis-canonicalization.
   - Refactored `AuthorizationResult.Allowed` to carry the verified canonical path of the request resolved by the policy engine.

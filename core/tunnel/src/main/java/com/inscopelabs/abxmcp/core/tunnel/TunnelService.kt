@@ -54,6 +54,9 @@ class TunnelService : Service() {
         tunnelManager = TunnelManagerProvider.get(this)
         createNotificationChannel()
 
+        // GRACEFUL PERMISSION HANDLING: On API 33+, if POST_NOTIFICATIONS is denied,
+        // startForeground() still executes successfully and the service starts/runs normally.
+        // The system simply suppresses/does not display the active status notification.
         val initialNotification = createNotificationForState(tunnelManager.stateFlow.value)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -143,7 +146,7 @@ class TunnelService : Service() {
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "ABX-MCP Tunnel Status Notification"
+                description = "ABC Server Tunnel Status Notification"
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -152,9 +155,9 @@ class TunnelService : Service() {
 
     private fun createNotificationForState(state: TunnelState): Notification {
         val (title, text) = when (state) {
-            TunnelState.RUNNING -> Pair("ABX-MCP Tunnel Active", "The secure hardware-backed tunnel is active.")
-            TunnelState.UNAVAILABLE -> Pair("ABX-MCP Tunnel Unavailable", "The secure tunnel is unavailable on this device.")
-            TunnelState.STOPPED -> Pair("ABX-MCP Tunnel Stopped", "The secure tunnel is stopped.")
+            TunnelState.RUNNING -> Pair("ABC Server Tunnel Active", "The secure hardware-backed tunnel is active.")
+            TunnelState.UNAVAILABLE -> Pair("ABC Server Tunnel Unavailable", "The secure tunnel is unavailable on this device.")
+            TunnelState.STOPPED -> Pair("ABC Server Tunnel Stopped", "The secure tunnel is stopped.")
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)

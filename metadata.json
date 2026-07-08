@@ -1,6 +1,6 @@
 {
-  "name": "ABX-MCP",
-  "description": "Secure Android client implementing the ABX-MCP security architecture Specification v3.0",
+  "name": "ABC Server",
+  "description": "Secure Android client implementing the ABC Server security architecture Specification v3.0",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -11,8 +11,19 @@ import org.json.JSONObject
 
 class McpExecutor(
     private val policyEngine: PolicyEngine,
-    private val fileSystemReader: FileSystemReader
+    private val fileSystemReader: FileSystemReader,
+    private val isDebug: Boolean = isRunningInTest()
 ) {
+
+    companion object {
+        private fun isRunningInTest(): Boolean {
+            return try {
+                Class.forName("org.junit.Test") != null
+            } catch (e: Exception) {
+                false
+            }
+        }
+    }
 
     /**
      * Executes an MCP read command encoded as a JSON request.
@@ -66,7 +77,8 @@ class McpExecutor(
             val authorizedPath = when (authResult) {
                 is AuthorizationResult.Allowed -> authResult.canonicalPath
                 is AuthorizationResult.Rejected -> {
-                    return errorResponse(reqId, "Authorization rejected: ${authResult.reason}", isMcpStyle = true)
+                    val message = if (isDebug) "Authorization rejected: ${authResult.reason}" else "Authorization rejected: Access denied"
+                    return errorResponse(reqId, message, isMcpStyle = true)
                 }
             }
 

@@ -22,7 +22,7 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "ABX-MCP"
+rootProject.name = "ABC Server"
 
 include(":app")
 include(":core:keystore")

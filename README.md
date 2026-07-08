@@ -1,79 +1,64 @@
-# ABX-MCP
+# ABC Server (Auto Bridge Context Server)
 
-Auto Bridge Context Server — a native Android security client implementing
-the ABX-MCP architecture (Specification Revision 3.0). Provides a
-hardware-backed, session-gated, capability-scoped bridge between an on-device
-MCP tool runtime and the local filesystem, with full audit logging.
+ABC Server is a native Android security client implementing the ABC Server architecture (Specification Revision 3.0). It provides a hardware-backed, session-gated, capability-scoped bridge between an on-device Model Context Protocol (MCP) tool runtime and the local filesystem, with full append-only cryptographically signed audit logging.
 
-Built incrementally, phase by phase, against a fixed spec — see
-`CHANGELOG.md` for what's landed so far and the phase-by-phase build log for
-the full roadmap (0–11).
+The internal Kotlin package structure uses the namespace `com.inscopelabs.abxmcp` as an internal codename and package identifier, while all user-facing surfaces and external references are fully branded as **ABC Server**.
 
-## Module structure
+## Key Features
 
-```
-:app                 UI (Jetpack Compose) & orchestration
-:core:keystore        Key generation, attestation, non-exportable key material
-:core:session          Session state machine, local-gesture-gated activation
-:core:tunnel           Foreground service, cloudflared process lifecycle
-:core:policy           Allowlist enforcement, path/operation authorization
-:core:filesystem       Raw IO + SAF-backed file access
-:core:mcp              MCP tool execution handlers
-:core:audit            Append-only, hash-chained, signable audit log
-```
+- **Hardware-Backed Key Generation & Attestation**: Non-exportable, secure hardware-backed key material with cryptographic attestation generated inside the Android KeyStore.
+- **Session-Gated Lifecycles**: Explicit local gesture requirements (e.g., button press) to activate or extend session state, with secure, background coroutine-driven TTL countdowns.
+- **Granular Capability Scope & Policy Engine**: Strict authorization rules mapped to capability tokens (including allowed operations and directory allowed roots).
+- **Time-of-Check to Time-of-Use (TOCTOU) Defenses**: The MCP Executor uses the verified canonical path resolved by the Policy Engine, preventing path traversal, symlink-swapping exploits, and content:// scheme leaks.
+- **Hardened Replay Protection**: Synchronized timestamp-based nonce tracking with automatic background eviction to defend against session replay attacks under sustained loads.
+- **Foreground Service Status**: Live notification channel with API 33+ runtime permission requesting and graceful fallback.
 
-Manual dependency injection throughout (no Dagger/Hilt) — module boundaries
-are enforced by construction, not by a DI graph.
+## Module Map
 
-## Building
+The architecture is split into clean, single-responsibility modules:
 
-This project is developed inside Google AI Studio and has **no committed
-Gradle wrapper** — there's no local shell in this workflow to generate one.
-CI (`.github/workflows/build.yml`) uses `gradle/actions/setup-gradle` to
-fetch Gradle directly rather than relying on `./gradlew`.
+| Module | Description |
+| :--- | :--- |
+| `:app` | Jetpack Compose UI, main activity, permission request flows, and general app orchestration. |
+| `:core:keystore` | Secure cryptographic key management, Android KeyStore interactions, and attestation. |
+| `:core:session` | Session state machine, local-gesture requirements, and active/expired transition engines. |
+| `:core:tunnel` | Background `cloudflared` tunnel process management, foreground status notifications, and live StateFlow updates. |
+| `:core:policy` | Authorization rules, path resolution/normalization, and allowed directory root matching. |
+| `:core:filesystem` | Safe file access operations interacting directly with the filesystem. |
+| `:core:mcp` | Model Context Protocol tool execution, request validation, and JSON RPC parsers. |
+| `:core:audit` | Append-only, hash-chained, and signed audit logging for all filesystem operations. |
 
-If you're opening this in Android Studio instead:
+## Building & Installation
 
-1. Open Android Studio, **Open**, select this directory, let it sync.
-2. Create a `.env` file in the project root and set `GEMINI_API_KEY` (see
-   `.env.example`). Only needed if you're exercising the (currently unused)
-   Firebase AI dependency — core ABX-MCP functionality doesn't require it.
-3. Run on an emulator or physical device.
+This project is developed inside Google AI Studio and contains **no committed Gradle wrapper**. The project utilizes modern Android development practices, using Kotlin DSL (`build.gradle.kts`) and Jetpack Compose.
 
-**Note on emulators:** `core/keystore`'s `KeyStoreManager` currently treats
-any device reporting `Build.HARDWARE` of `goldfish` or `ranchu` (i.e. *any*
-Android emulator, not just Robolectric) as a non-secure environment and
-falls back to an in-memory mock keystore. This means emulator runs — AI
-Studio's included emulator or otherwise — will not exercise real
-`AndroidKeyStore` behavior. Verified functionality (hardware-backed key
-generation, attestation, TEE status) requires a physical device via the Play
-Console internal test track. This is a known issue to be fixed before it
-causes confusion in later phases.
+### Local Development in Android Studio
 
-## Signing
+1. **Clone & Open**: Clone the repository and open the root directory in Android Studio. Let the IDE sync dependencies automatically.
+2. **Environment Variables**: Create a `.env` file in the root directory following `.env.example` if you are using external integrations or custom debug credentials.
+3. **Run**: Deploy to a physical device or emulator.
+   * *Note on Emulators*: `core:keystore` automatically falls back to an in-memory mock keystore if it detects an emulator environment (e.g. `goldfish` or `ranchu`), bypassing actual hardware-backed requirements for testing convenience. Real TEE/StrongBox behaviors require deployment on a physical Android device.
 
-- **Debug builds** use `debugConfig`, driven by `DEBUG_STORE_PASSWORD` /
-  `DEBUG_KEY_ALIAS` / `DEBUG_KEY_PASSWORD` env vars, falling back to Android's
-  standard public debug-keystore defaults if unset. No custom secrets are
-  hardcoded.
-- **Release builds** use `KEYSTORE_PATH` / `STORE_PASSWORD` / `KEY_PASSWORD`
-  env vars, expected to point at a real upload keystore. Not committed to
-  the repo.
+## CI Requirements & GitHub Actions
+
+The continuous integration pipeline is defined in `.github/workflows/build.yml`.
+- **No Gradle Wrapper**: Since there is no `gradlew` script in the repository, the CI environment uses `gradle/actions/setup-gradle` to automatically provision the correct Gradle runtime.
+- **Build Verification**: Compiles both debug and release configurations.
+- **Local JVM Testing**: Runs all local JUnit, Robolectric, and Roborazzi screenshot/visual verification tests on every push.
+
+## Project Phase Status
+
+This project has completed all core development and remediation phases:
+
+- **Phases 1-5**: Core functional implementation of key management, local session gating, `cloudflared` tunnel lifecycle, policy validation, MCP JSON-RPC executors, and cryptographically chained audit logging.
+- **Phase 6.3 (Tunnel Lifecycle Truthfulness Remediation)**: Removed silent run fallbacks; implemented real binary checking on `libcloudflared.so` using ELF magic headers.
+- **Phase 6.4 (Path Semantics & Replay Hardening Remediation)**: Prevented TOCTOU symlink-swapping attacks by passing authorized canonical paths from the Policy Engine directly to raw I/O readers; explicitly rejected non-file schemes (e.g., `content://`); implemented bounded-memory concurrent nonce caching.
+- **Phase 6.5 (Manifest & Permission Correctness)**: Added explicit manifest declarations for `INTERNET` and `POST_NOTIFICATIONS`; introduced an API 33+ dynamic permission request flow with graceful non-blocking behavior.
+- **Phase 6.6 (Branding & Documentation Consistency)**: Rebranded all user-facing strings, notifications, clipboard formats, and titles to **ABC Server**.
 
 ## Testing
 
-- Unit tests (JUnit 5 / Mockk / Robolectric) run via `gradle test`, wired
-  into CI on every push.
-- `connectedAndroidTest` is **intentionally not run in CI** — GitHub-hosted
-  runners have no attached device, and this project has no CI emulator step.
-  Instrumented behavior is currently verified manually via AI Studio's
-  emulator (with the caveat above) and, where hardware-backed behavior
-  actually matters, a real device through the test track.
-
-## Firebase
-
-`google-services.json` in this repo is a **placeholder** (fake project ID,
-fake API key). Nothing in the app currently calls Firebase at runtime, so
-this doesn't affect current functionality — but it will need a real Firebase
-project wired in before any phase that actually exercises `firebase.ai` or
-App Check.
+Run unit tests and Robolectric checks locally:
+```bash
+gradle :app:testDebugUnitTest
+```

@@ -1,6 +1,6 @@
-# Contributing to ABX-MCP
+# Contributing to ABC Server
 
-Thank you for your interest in contributing to the ABX-MCP security architecture client!
+Thank you for your interest in contributing to the ABC Server security client!
 
 ## Code of Conduct
 
