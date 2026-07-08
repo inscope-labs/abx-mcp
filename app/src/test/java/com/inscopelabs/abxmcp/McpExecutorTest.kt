@@ -19,6 +19,9 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlinx.coroutines.*
+import androidx.documentfile.provider.DocumentFile
+import androidx.documentfile.provider.MockDocumentFile
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -426,5 +429,346 @@ class McpExecutorTest {
         val content = String(readBytes!!, Charsets.UTF_8)
         assertEquals("original content", content)
         assertNotEquals("secret password!", content)
+    }
+
+    /**
+     * Interrupted-write test: Mock the socket/channel to drop mid-write.
+     * Assert the target file path is empty or unchanged and the temp file is cleaned up.
+     */
+    @Test
+    fun testInterruptedWrite_CleansUpTempAndLeavesTargetUnchanged() {
+        val targetFile = File(tempDir.toFile(), "interrupted_target.txt")
+        val tempFile = File(tempDir.toFile(), "interrupted_target.txt.tmp")
+        
+        // Assert neither exists initially
+        assertFalse(targetFile.exists())
+        assertFalse(tempFile.exists())
+
+        // Set interceptor to throw an exception to mock socket/channel dropping mid-write
+        fileSystemReader.writeInterceptor = { f ->
+            // Check that temp file exists while writing
+            assertTrue(f.exists())
+            throw java.io.IOException("Socket/channel dropped mid-write")
+        }
+
+        try {
+            fileSystemReader.writeFile(targetFile.absolutePath, "some partial data".toByteArray())
+            fail("Should have thrown IOException")
+        } catch (e: java.io.IOException) {
+            assertEquals("Socket/channel dropped mid-write", e.message)
+        } finally {
+            fileSystemReader.writeInterceptor = null
+        }
+
+        // Assert target remains unchanged/empty (does not exist) and temp is cleaned up
+        assertFalse(targetFile.exists())
+        assertFalse(tempFile.exists())
+    }
+
+    /**
+     * Race test: Start a coroutine for write_file and another for delete_file on the same path simultaneously.
+     * Assert the final state is deterministic (not corrupted).
+     */
+    @Test
+    fun testRaceCondition_WriteAndDeleteSamePath_FinalStateIsDeterministic() = kotlinx.coroutines.runBlocking {
+        val targetFile = File(tempDir.toFile(), "race_file.txt")
+        
+        val writeReq = JSONObject().apply {
+            put("method", "write_file")
+            put("params", JSONObject().apply {
+                put("path", targetFile.absolutePath)
+                put("content", "race content")
+            })
+        }.toString()
+
+        val deleteReq = JSONObject().apply {
+            put("method", "delete_file")
+            put("params", JSONObject().apply {
+                put("path", targetFile.absolutePath)
+            })
+        }.toString()
+
+        // We run multiple write and delete operations concurrently
+        val jobs = mutableListOf<kotlinx.coroutines.Job>()
+        val dispatcher = kotlinx.coroutines.Dispatchers.Default
+        
+        repeat(10) {
+            jobs.add(launch(dispatcher) {
+                mcpExecutor.execute(writeReq, activeToken, SessionState.ACTIVE)
+            })
+            jobs.add(launch(dispatcher) {
+                mcpExecutor.execute(deleteReq, activeToken, SessionState.ACTIVE)
+            })
+        }
+
+        jobs.joinAll()
+
+        // Since operations on the same path for a session are serialized (synchronized on path-level locks),
+        // the final state is deterministic: either the file exists with exact content or it does not exist.
+        // It must NOT be in a corrupted state (e.g. half-written, throwing unexpected exceptions, or containing garbage).
+        if (targetFile.exists()) {
+            assertEquals("race content", targetFile.readText())
+        } else {
+            assertFalse(targetFile.exists())
+        }
+    }
+
+    /**
+     * Tier-Enforcement: Token scoped only to write_file. Attempt delete_file.
+     * Must fail at Policy Engine before OS call.
+     */
+    @Test
+    fun testTierEnforcement_TokenScopedOnlyToWriteFile_DeleteFileFailsAtPolicyEngine() {
+        val targetFile = File(tempDir.toFile(), "tier_test_file.txt").apply {
+            writeText("initial")
+        }
+        
+        // Token has only "write_file" allowed operations
+        val writeOnlyToken = Capability(
+            sessionId = "session_write_only",
+            expiry = System.currentTimeMillis() + 3600_000,
+            allowedOperations = listOf("write_file"),
+            allowedRoots = listOf(tempDir.toFile().absolutePath),
+            nonceSeed = "random_seed_123"
+        )
+
+        val deleteReq = JSONObject().apply {
+            put("method", "delete_file")
+            put("params", JSONObject().apply {
+                put("path", targetFile.absolutePath)
+            })
+        }.toString()
+
+        val respStr = mcpExecutor.execute(deleteReq, writeOnlyToken, SessionState.ACTIVE)
+        val resp = JSONObject(respStr)
+
+        // Must fail with authorization rejection
+        assertTrue(resp.getBoolean("isError"))
+        val contentArr = resp.getJSONArray("content")
+        val errorText = contentArr.getJSONObject(0).getString("text")
+        assertTrue(errorText.contains("Authorization rejected"))
+        
+        // Assert that target file was NOT deleted (remains intact because OS call was never made)
+        assertTrue(targetFile.exists())
+        assertEquals("initial", targetFile.readText())
+    }
+
+    /**
+     * End-to-end: Run the TimeVelocity.js example from Specification Section 8.
+     * Confirm the file is created with correct content.
+     */
+    @Test
+    fun testEndToEnd_TimeVelocityScenario_CreatesFileWithCorrectContent() {
+        val targetFile = File(tempDir.toFile(), "TimeVelocity.js")
+        assertFalse(targetFile.exists())
+
+        // Enable write operation for our capability token
+        val writeEnabledToken = Capability(
+            sessionId = "session_time_velocity",
+            expiry = System.currentTimeMillis() + 3600_000,
+            allowedOperations = listOf("write_file"),
+            allowedRoots = listOf(tempDir.toFile().absolutePath),
+            nonceSeed = "random_seed_123"
+        )
+
+        val jsContent = """
+            // TimeVelocity.js - Specification Section 8 Example
+            function calculateVelocity(distance, time) {
+                if (time <= 0) return 0;
+                return distance / time;
+            }
+            console.log("Velocity:", calculateVelocity(100, 5));
+        """.trimIndent()
+
+        // Build tools/call request for write_file
+        val mcpRequestJson = JSONObject().apply {
+            put("jsonrpc", "2.0")
+            put("id", "req_time_velocity_01")
+            put("method", "tools/call")
+            put("params", JSONObject().apply {
+                put("name", "write_file")
+                put("arguments", JSONObject().apply {
+                    put("path", targetFile.absolutePath)
+                    put("content", jsContent)
+                })
+            })
+        }.toString()
+
+        val responseStr = mcpExecutor.execute(mcpRequestJson, writeEnabledToken, SessionState.ACTIVE)
+        val response = JSONObject(responseStr)
+
+        // Assert no error
+        assertFalse(response.getBoolean("isError"))
+        assertEquals("req_time_velocity_01", response.getString("id"))
+
+        // Confirm the file is created with correct content
+        assertTrue(targetFile.exists())
+        assertEquals(jsContent, targetFile.readText())
+    }
+
+    /**
+     * Live Revocation: Start a session with a SAF grant. Use adb or system settings UI automation (mocked here)
+     * to revoke the URI permission while the session is ACTIVE. Send a read_file request. Assert it is rejected.
+     */
+    @Test
+    fun testLiveRevocation_WithActiveSession_FailsAfterRevocation() {
+        val testFile = File(tempDir.toFile(), "saf_revocation.txt").apply {
+            writeText("saf content")
+        }
+
+        PolicyEngineImpl.isSafModeActive = true
+        PolicyEngineImpl.context = context
+        PolicyEngineImpl.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+
+        val mockDocFile = MockDocumentFile(canReadVal = true, canWriteVal = true)
+        PolicyEngineImpl.documentFileResolver = { _, _ -> mockDocFile }
+
+        // Create capability token with read permission
+        val safToken = Capability(
+            sessionId = "session_saf_revocation",
+            expiry = System.currentTimeMillis() + 3600_000,
+            allowedOperations = listOf("read_file"),
+            allowedRoots = emptyList(), // Not used under SAF mode
+            nonceSeed = "seed123"
+        )
+
+        val readReq = JSONObject().apply {
+            put("method", "read_file")
+            put("params", JSONObject().apply {
+                put("path", testFile.absolutePath)
+            })
+        }.toString()
+
+        // 1. Initial request: permission granted, must succeed
+        val firstRespStr = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+        val firstResp = JSONObject(firstRespStr)
+        assertFalse(firstResp.getBoolean("isError"))
+        val contentArr = firstResp.getJSONArray("content")
+        val contentBase64 = contentArr.getJSONObject(0).getString("text")
+        val decodedText = String(Base64.decode(contentBase64, Base64.DEFAULT))
+        assertEquals("saf content", decodedText)
+
+        // 2. Simulate live revocation: canReadVal changes to false
+        mockDocFile.canReadVal = false
+
+        // 3. Second request: permission revoked, must be rejected
+        val secondRespStr = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+        val secondResp = JSONObject(secondRespStr)
+        assertTrue(secondResp.getBoolean("isError"))
+        val errorText = secondResp.getJSONArray("content").getJSONObject(0).getString("text")
+        assertTrue(errorText.contains("Authorization rejected") || errorText.contains("read permissions"))
+
+        // Cleanup
+        PolicyEngineImpl.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
+        PolicyEngineImpl.isSafModeActive = false
+        PolicyEngineImpl.context = null
+        PolicyEngineImpl.safTreeUri = null
+    }
+
+    /**
+     * Drift Test: Confirm there is no cached copy of the SAF grant list. If the application is killed
+     * and restarted (or we query multiple times), the state must be re-derived from the OS on every request.
+     */
+    @Test
+    fun testDrift_NoCachedGrants_ReEvaluatesLiveFromOS() {
+        val testFile = File(tempDir.toFile(), "saf_drift.txt").apply {
+            writeText("drift content")
+        }
+
+        PolicyEngineImpl.isSafModeActive = true
+        PolicyEngineImpl.context = context
+        PolicyEngineImpl.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+
+        val mockDocFile = MockDocumentFile(canReadVal = true, canWriteVal = true)
+        var callCount = 0
+        PolicyEngineImpl.documentFileResolver = { _, _ ->
+            callCount++
+            mockDocFile
+        }
+
+        val safToken = Capability(
+            sessionId = "session_saf_drift",
+            expiry = System.currentTimeMillis() + 3600_000,
+            allowedOperations = listOf("read_file"),
+            allowedRoots = emptyList(),
+            nonceSeed = "seed123"
+        )
+
+        val readReq = JSONObject().apply {
+            put("method", "read_file")
+            put("params", JSONObject().apply {
+                put("path", testFile.absolutePath)
+            })
+        }.toString()
+
+        // Call execute
+        val resp1 = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+        assertFalse(JSONObject(resp1).getBoolean("isError"))
+
+        // Verify that DocumentFile resolver was called
+        assertEquals(1, callCount)
+
+        // Call again to verify no cache is used
+        val resp2 = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+        assertFalse(JSONObject(resp2).getBoolean("isError"))
+
+        // Verify it was called twice, proving zero caching of the SAF permission check
+        assertEquals(2, callCount)
+
+        // Cleanup
+        PolicyEngineImpl.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
+        PolicyEngineImpl.isSafModeActive = false
+        PolicyEngineImpl.context = null
+        PolicyEngineImpl.safTreeUri = null
+    }
+
+    /**
+     * Re-run operation-tier tests in SAF mode: Ensure SAF grant doesn't implicitly authorize delete.
+     */
+    @Test
+    fun testOperationTierInSafMode_DoesNotImplicitlyAuthorizeDelete() {
+        val testFile = File(tempDir.toFile(), "saf_delete_test.txt").apply {
+            writeText("some content")
+        }
+
+        PolicyEngineImpl.isSafModeActive = true
+        PolicyEngineImpl.context = context
+        PolicyEngineImpl.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+
+        val mockDocFile = MockDocumentFile(canReadVal = true, canWriteVal = true)
+        PolicyEngineImpl.documentFileResolver = { _, _ -> mockDocFile }
+
+        // SAF grant has write permissions, but the capability token ONLY has "write_file" allowed operations (no delete_file)
+        val writeOnlyToken = Capability(
+            sessionId = "session_saf_delete",
+            expiry = System.currentTimeMillis() + 3600_000,
+            allowedOperations = listOf("write_file"),
+            allowedRoots = emptyList(),
+            nonceSeed = "seed123"
+        )
+
+        val deleteReq = JSONObject().apply {
+            put("method", "delete_file")
+            put("params", JSONObject().apply {
+                put("path", testFile.absolutePath)
+            })
+        }.toString()
+
+        // Execute delete command, must be rejected because "delete_file" operation is not allowed on operation-tier
+        val respStr = mcpExecutor.execute(deleteReq, writeOnlyToken, SessionState.ACTIVE)
+        val resp = JSONObject(respStr)
+
+        assertTrue(resp.getBoolean("isError"))
+        val errorText = resp.getJSONArray("content").getJSONObject(0).getString("text")
+        assertTrue(errorText.contains("Authorization rejected") || errorText.contains("not in allowed operations"))
+
+        // Assert that the file is NOT deleted (remains intact)
+        assertTrue(testFile.exists())
+
+        // Cleanup
+        PolicyEngineImpl.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
+        PolicyEngineImpl.isSafModeActive = false
+        PolicyEngineImpl.context = null
+        PolicyEngineImpl.safTreeUri = null
     }
 }

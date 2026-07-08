@@ -18,6 +18,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.documentfile)
     implementation(project(":core:session"))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

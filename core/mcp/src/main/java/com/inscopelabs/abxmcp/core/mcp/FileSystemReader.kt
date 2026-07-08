@@ -22,9 +22,14 @@ interface FileSystemReader {
     fun getLastModified(path: String): Long
     fun readFile(path: String): ByteArray
     fun listDirectory(path: String): List<String>
+    fun writeFile(path: String, content: ByteArray)
+    fun appendFile(path: String, content: ByteArray)
+    fun deleteFile(path: String): Boolean
 }
 
 class FileSystemReaderImpl(private val context: Context) : FileSystemReader {
+
+    var writeInterceptor: ((File) -> Unit)? = null
 
     private fun isContentUri(path: String): Boolean {
         return path.startsWith("content://")
@@ -140,5 +145,65 @@ class FileSystemReaderImpl(private val context: Context) : FileSystemReader {
             "xml" -> "application/xml"
             else -> "application/octet-stream"
         }
+    }
+
+    override fun writeFile(path: String, content: ByteArray) {
+        val targetFile = File(path)
+        val parent = targetFile.parentFile ?: throw FileNotFoundException("Parent directory not found")
+        if (!parent.exists()) {
+            parent.mkdirs()
+        }
+        val tempFile = File(parent, "${targetFile.name}.tmp")
+        try {
+            tempFile.outputStream().use { out ->
+                val chunkSize = 1024
+                var offset = 0
+                while (offset < content.size) {
+                    val len = minOf(chunkSize, content.size - offset)
+                    out.write(content, offset, len)
+                    out.flush()
+                    offset += len
+                    
+                    // Call interceptor to allow injecting failures
+                    writeInterceptor?.invoke(tempFile)
+                    
+                    if (Thread.currentThread().isInterrupted) {
+                        throw InterruptedException("Write interrupted")
+                    }
+                }
+            }
+            // atomic rename
+            if (!tempFile.renameTo(targetFile)) {
+                try {
+                    java.nio.file.Files.move(
+                        tempFile.toPath(),
+                        targetFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                    )
+                } catch (e: Exception) {
+                    throw java.io.IOException("Failed to rename temp file to target file: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            if (tempFile.exists()) {
+                tempFile.delete()
+            }
+            throw e
+        }
+    }
+
+    override fun appendFile(path: String, content: ByteArray) {
+        val targetFile = File(path)
+        val parent = targetFile.parentFile ?: throw FileNotFoundException("Parent directory not found")
+        if (!parent.exists()) {
+            parent.mkdirs()
+        }
+        targetFile.appendBytes(content)
+    }
+
+    override fun deleteFile(path: String): Boolean {
+        val file = File(path)
+        if (!file.exists()) return false
+        return file.delete()
     }
 }

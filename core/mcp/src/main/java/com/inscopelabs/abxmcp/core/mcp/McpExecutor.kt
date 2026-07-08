@@ -15,6 +15,8 @@ class McpExecutor(
     private val isDebug: Boolean = isRunningInTest()
 ) {
 
+    private val sessionPathLocks = java.util.concurrent.ConcurrentHashMap<Pair<String, String>, Any>()
+
     companion object {
         private fun isRunningInTest(): Boolean {
             return try {
@@ -66,6 +68,9 @@ class McpExecutor(
                 "get_file_version", "version" -> "get_file_version"
                 "read_file", "read" -> "read_file"
                 "list_directory", "list" -> "list_directory"
+                "write_file", "write" -> "write_file"
+                "append_file", "append" -> "append_file"
+                "delete_file", "delete" -> "delete_file"
                 else -> {
                     return errorResponse(reqId, "Unknown method or operation: $method", isMcpStyle = true)
                 }
@@ -119,6 +124,44 @@ class McpExecutor(
                         resultObj.put("content", textStr)
                         resultObj.put("encoding", "text")
                     }
+                }
+                "write_file" -> {
+                    val contentStr = paramsObj.optString("content", "")
+                    val encoding = paramsObj.optString("encoding", "text")
+                    val bytes = if (encoding == "base64" || encoding == "binary") {
+                        Base64.decode(contentStr, Base64.DEFAULT)
+                    } else {
+                        contentStr.toByteArray(Charsets.UTF_8)
+                    }
+                    val lockKey = Pair(token.sessionId, authorizedPath)
+                    val lock = sessionPathLocks.computeIfAbsent(lockKey) { Any() }
+                    synchronized(lock) {
+                        fileSystemReader.writeFile(authorizedPath, bytes)
+                    }
+                    resultObj.put("success", true)
+                }
+                "append_file" -> {
+                    val contentStr = paramsObj.optString("content", "")
+                    val encoding = paramsObj.optString("encoding", "text")
+                    val bytes = if (encoding == "base64" || encoding == "binary") {
+                        Base64.decode(contentStr, Base64.DEFAULT)
+                    } else {
+                        contentStr.toByteArray(Charsets.UTF_8)
+                    }
+                    val lockKey = Pair(token.sessionId, authorizedPath)
+                    val lock = sessionPathLocks.computeIfAbsent(lockKey) { Any() }
+                    synchronized(lock) {
+                        fileSystemReader.appendFile(authorizedPath, bytes)
+                    }
+                    resultObj.put("success", true)
+                }
+                "delete_file" -> {
+                    val lockKey = Pair(token.sessionId, authorizedPath)
+                    val lock = sessionPathLocks.computeIfAbsent(lockKey) { Any() }
+                    val deleted = synchronized(lock) {
+                        fileSystemReader.deleteFile(authorizedPath)
+                    }
+                    resultObj.put("deleted", deleted)
                 }
                 "list_directory" -> {
                     val files = fileSystemReader.listDirectory(authorizedPath)

@@ -66,6 +66,9 @@ class ReleaseBehaviorTest {
             override fun getLastModified(path: String): Long = 0L
             override fun readFile(path: String): ByteArray = ByteArray(0)
             override fun listDirectory(path: String): List<String> = emptyList()
+            override fun writeFile(path: String, content: ByteArray) {}
+            override fun appendFile(path: String, content: ByteArray) {}
+            override fun deleteFile(path: String): Boolean = false
         }
         
         // Instantiate McpExecutor in release mode (isDebug = false)
