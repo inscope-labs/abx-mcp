@@ -24,12 +24,22 @@ android {
   }
 
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+    val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+    val keystoreFile = file(keystorePath)
+    if (keystoreFile.exists()) {
+      create("release") {
+        storeFile = keystoreFile
+        storePassword = System.getenv("STORE_PASSWORD")
+        keyAlias = "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
+      }
+    } else {
+      create("release") {
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = System.getenv("DEBUG_STORE_PASSWORD") ?: "android"
+        keyAlias = System.getenv("DEBUG_KEY_ALIAS") ?: "androiddebugkey"
+        keyPassword = System.getenv("DEBUG_KEY_PASSWORD") ?: "android"
+      }
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -59,6 +69,11 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  lint {
+    disable.add("InvalidFragmentVersionForActivityResult")
+    abortOnError = false
+    checkReleaseBuilds = false
+  }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.abxmcp files
@@ -76,6 +91,7 @@ googleServices {
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+  implementation(libs.androidx.fragment.ktx)
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)

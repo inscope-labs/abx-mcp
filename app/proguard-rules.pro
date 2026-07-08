@@ -43,3 +43,10 @@
 -dontwarn androidx.room.limit.annotations.RestrictTo
 -keep class * extends androidx.room.migration.Migration
 -keep class * extends androidx.room.RoomDatabase$Callback
+
+# Suppress R8/ProGuard warnings for missing classes that are not used at runtime
+-dontwarn com.google.api.client.http.**
+-dontwarn java.lang.management.**
+-dontwarn org.joda.time.**
+-dontwarn io.ktor.**
+
