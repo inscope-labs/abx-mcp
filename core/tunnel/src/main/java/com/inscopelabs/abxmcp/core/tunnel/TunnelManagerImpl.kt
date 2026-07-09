@@ -5,19 +5,25 @@ import com.inscopelabs.abxmcp.core.session.SessionManager
 import com.inscopelabs.abxmcp.core.session.SessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.IOException
 
 class TunnelManagerImpl(
     private val context: Context,
     private val sessionManager: SessionManager,
     private val environment: TunnelEnvironment = TunnelEnvironment.PRODUCTION,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
+    parentScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
+    private val relayUrl: String? = null,
+    @Volatile private var transportProvider: TransportProvider? = null
 ) : TunnelManager {
+
+    private val supervisorJob = SupervisorJob(parentScope.coroutineContext[Job])
+    private val scope = CoroutineScope(parentScope.coroutineContext + supervisorJob)
 
     private val _isRunningFlow = MutableStateFlow(false)
     override val isRunningFlow: StateFlow<Boolean> = _isRunningFlow.asStateFlow()
@@ -25,7 +31,8 @@ class TunnelManagerImpl(
     private val _stateFlow = MutableStateFlow(TunnelState.STOPPED)
     override val stateFlow: StateFlow<TunnelState> = _stateFlow.asStateFlow()
 
-    private var activeProcess: Process? = null
+    private var monitoringJob: Job? = null
+    private var reconnectJob: Job? = null
 
     init {
         _stateFlow.value = determineInitialState()
@@ -47,25 +54,12 @@ class TunnelManagerImpl(
             TunnelEnvironment.TEST_UNAVAILABLE -> TunnelState.UNAVAILABLE
             TunnelEnvironment.TEST_AVAILABLE -> TunnelState.STOPPED
             TunnelEnvironment.PRODUCTION -> {
-                val nativeLibDir = context.applicationInfo.nativeLibraryDir
-                val binary = File(nativeLibDir, "libcloudflared.so")
-                if (isValidElfBinary(binary)) {
-                    TunnelState.STOPPED
-                } else {
+                if (relayUrl.isNullOrBlank()) {
                     TunnelState.UNAVAILABLE
+                } else {
+                    TunnelState.STOPPED
                 }
             }
-        }
-    }
-
-    private fun isValidElfBinary(file: File): Boolean {
-        if (!file.exists() || file.length() < 4) return false
-        val bytes = ByteArray(4)
-        try {
-            file.inputStream().use { it.read(bytes) }
-            return bytes[0] == 0x7F.toByte() && bytes[1] == 'E'.toByte() && bytes[2] == 'L'.toByte() && bytes[3] == 'F'.toByte()
-        } catch (e: Exception) {
-            return false
         }
     }
 
@@ -73,16 +67,7 @@ class TunnelManagerImpl(
         if (_stateFlow.value == TunnelState.UNAVAILABLE) {
             return false
         }
-        val process = activeProcess
-        if (process != null) {
-            try {
-                process.exitValue()
-                return false
-            } catch (e: IllegalThreadStateException) {
-                return true
-            }
-        }
-        return false
+        return transportProvider?.isConnected() ?: false
     }
 
     @Synchronized
@@ -103,40 +88,32 @@ class TunnelManagerImpl(
             return true
         }
 
-        val pb = when (environment) {
+        val provider = transportProvider ?: when (environment) {
             TunnelEnvironment.TEST_AVAILABLE -> {
-                val isWindows = System.getProperty("os.name").lowercase().contains("win")
-                if (isWindows) {
-                    ProcessBuilder("cmd.exe", "/c", "ping -t 127.0.0.1")
-                } else {
-                    ProcessBuilder("sleep", "3600")
-                }
+                FakeTransportProvider(initialConnected = true)
             }
             TunnelEnvironment.TEST_UNAVAILABLE -> {
                 _stateFlow.value = TunnelState.UNAVAILABLE
                 return false
             }
             TunnelEnvironment.PRODUCTION -> {
-                val nativeLibDir = context.applicationInfo.nativeLibraryDir
-                val binary = File(nativeLibDir, "libcloudflared.so")
-                if (!isValidElfBinary(binary)) {
+                val url = relayUrl
+                if (url.isNullOrBlank()) {
                     _stateFlow.value = TunnelState.UNAVAILABLE
                     return false
                 }
-                try {
-                    binary.setExecutable(true)
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                ProcessBuilder(binary.absolutePath, "tunnel", "run")
+                WebSocketTransport(url)
             }
         }
+        transportProvider = provider
 
-        try {
-            val process = pb.start()
-            activeProcess = process
+        val connected = provider.connect()
+        if (connected) {
             _isRunningFlow.value = true
             _stateFlow.value = TunnelState.RUNNING
+
+            // Start connection monitoring
+            startConnectionMonitoring()
 
             // Enqueue unique WorkManager TTL check
             try {
@@ -153,8 +130,7 @@ class TunnelManagerImpl(
             }
 
             return true
-        } catch (e: IOException) {
-            e.printStackTrace()
+        } else {
             _stateFlow.value = TunnelState.STOPPED
             _isRunningFlow.value = false
             return false
@@ -163,15 +139,12 @@ class TunnelManagerImpl(
 
     @Synchronized
     override fun stopTunnel() {
-        activeProcess?.let { process ->
-            try {
-                process.destroy()
-                process.destroyForcibly()
-            } catch (e: Exception) {
-                // Ignore
-            }
-        }
-        activeProcess = null
+        monitoringJob?.cancel()
+        monitoringJob = null
+        reconnectJob?.cancel()
+        reconnectJob = null
+        
+        transportProvider?.disconnect()
         _isRunningFlow.value = false
         val currentAvail = determineInitialState()
         _stateFlow.value = if (currentAvail == TunnelState.UNAVAILABLE) {
@@ -180,5 +153,48 @@ class TunnelManagerImpl(
             TunnelState.STOPPED
         }
     }
-}
 
+    private fun startConnectionMonitoring() {
+        monitoringJob?.cancel()
+        monitoringJob = scope.launch {
+            while (isTunnelRunning()) {
+                delay(1000)
+            }
+            // If we exited the loop and state is still RUNNING, handle disconnect
+            if (_stateFlow.value == TunnelState.RUNNING) {
+                handleConnectionDrop()
+            }
+        }
+    }
+
+    private fun handleConnectionDrop() {
+        reconnectJob?.cancel()
+        reconnectJob = scope.launch {
+            val reconnected = transportProvider?.connect() ?: false
+            if (reconnected) {
+                startConnectionMonitoring()
+            } else {
+                _isRunningFlow.value = false
+                val currentAvail = determineInitialState()
+                _stateFlow.value = if (currentAvail == TunnelState.UNAVAILABLE) {
+                    TunnelState.UNAVAILABLE
+                } else {
+                    TunnelState.STOPPED
+                }
+            }
+        }
+    }
+
+    // Seam to inject or retrieve transport provider in tests
+    fun getTransportProvider(): TransportProvider? {
+        return transportProvider
+    }
+
+    fun setTransportProvider(provider: TransportProvider?) {
+        transportProvider = provider
+    }
+
+    fun cancel() {
+        supervisorJob.cancel()
+    }
+}

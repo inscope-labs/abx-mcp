@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.work.runtime)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.okhttp)
     implementation(project(":core:session"))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

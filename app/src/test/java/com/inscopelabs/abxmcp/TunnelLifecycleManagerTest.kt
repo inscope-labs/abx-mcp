@@ -50,6 +50,7 @@ class TunnelLifecycleManagerTest {
     @After
     fun tearDown() {
         tunnelManager.stopTunnel()
+        (tunnelManager as? TunnelManagerImpl)?.cancel()
         SessionManagerProvider.setForTesting(null)
         TunnelManagerProvider.setForTesting(null)
     }
@@ -212,5 +213,80 @@ class TunnelLifecycleManagerTest {
         // Clean up
         serviceController.destroy()
         com.inscopelabs.abxmcp.core.tunnel.TunnelService.testScope = null
+    }
+
+    @Test
+    fun testWebSocketConnectDisconnectLifecycle() {
+        val server = LightweightWebSocketServer()
+        val port = server.start()
+        try {
+            val url = "ws://localhost:$port"
+            val transport = com.inscopelabs.abxmcp.core.tunnel.WebSocketTransport(url)
+            
+            val connected = transport.connect()
+            assertTrue("Should connect successfully to the local mock server", connected)
+            assertTrue("Should report as connected", transport.isConnected())
+            
+            transport.disconnect()
+            assertFalse("Should report as disconnected after disconnect()", transport.isConnected())
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun testNoEndpointConfigured_ReportsUnavailable() {
+        val manager = TunnelManagerImpl(
+            context,
+            sessionManager,
+            com.inscopelabs.abxmcp.core.tunnel.TunnelEnvironment.PRODUCTION,
+            relayUrl = null // Explicitly null/empty
+        )
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        val started = manager.startTunnel()
+        assertFalse("Should fail to start when no endpoint is configured", started)
+        assertEquals(com.inscopelabs.abxmcp.core.tunnel.TunnelState.UNAVAILABLE, manager.stateFlow.value)
+    }
+
+    @Test
+    fun testReconnectOnDrop_Simulated() = runTest {
+        val fakeTransport = com.inscopelabs.abxmcp.core.tunnel.FakeTransportProvider(initialConnected = true)
+        val manager = TunnelManagerImpl(
+            context,
+            sessionManager,
+            com.inscopelabs.abxmcp.core.tunnel.TunnelEnvironment.TEST_AVAILABLE,
+            parentScope = this,
+            transportProvider = fakeTransport
+        )
+        sessionManager.startSession(UserGesture.LocalButtonPress)
+        val started = manager.startTunnel()
+        assertTrue("Tunnel should start running", started)
+        assertEquals(com.inscopelabs.abxmcp.core.tunnel.TunnelState.RUNNING, manager.stateFlow.value)
+        assertTrue(manager.isTunnelRunning())
+
+        // Simulate connection drop
+        fakeTransport.simulateDrop()
+        
+        // Wait for connection monitoring loop (or advance time)
+        testScheduler.advanceTimeBy(2000)
+        testScheduler.runCurrent()
+
+        // It should try to reconnect. Since FakeTransportProvider.connect() will set connected back to true,
+        // check that it reconnected and is still running.
+        assertTrue("Tunnel should have reconnected and remain running", manager.isTunnelRunning())
+        assertEquals(com.inscopelabs.abxmcp.core.tunnel.TunnelState.RUNNING, manager.stateFlow.value)
+
+        // Now make reconnection fail
+        val failingFakeTransport = com.inscopelabs.abxmcp.core.tunnel.FakeTransportProvider(initialConnected = false)
+        manager.setTransportProvider(failingFakeTransport)
+        
+        failingFakeTransport.simulateDrop()
+        testScheduler.advanceTimeBy(2000)
+        testScheduler.runCurrent()
+
+        // Since reconnection failed, it should transition to stopped
+        assertFalse("Tunnel should no longer be running", manager.isTunnelRunning())
+        assertEquals(com.inscopelabs.abxmcp.core.tunnel.TunnelState.STOPPED, manager.stateFlow.value)
+        manager.cancel()
     }
 }
