@@ -6,21 +6,24 @@ import java.text.Normalizer
 
 class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : PolicyEngine {
 
+    @Volatile
+    var isSafModeActive: Boolean = false
+
+    @Volatile
+    var safTreeUri: String? = null
+
+    @Volatile
+    var context: android.content.Context? = null
+
+    @Volatile
+    var overrideRootPath: String? = null
+
+    @Volatile
+    var documentFileResolver: (android.content.Context, android.net.Uri) -> androidx.documentfile.provider.DocumentFile? = { ctx, uri ->
+        androidx.documentfile.provider.DocumentFile.fromTreeUri(ctx, uri)
+    }
+
     companion object {
-        @Volatile
-        var isSafModeActive: Boolean = false
-
-        @Volatile
-        var safTreeUri: String? = null
-
-        @Volatile
-        var context: android.content.Context? = null
-
-        @Volatile
-        var documentFileResolver: (android.content.Context, android.net.Uri) -> androidx.documentfile.provider.DocumentFile? = { ctx, uri ->
-            androidx.documentfile.provider.DocumentFile.fromTreeUri(ctx, uri)
-        }
-
         fun getRootPathFromTreeUri(context: android.content.Context, uri: android.net.Uri): String? {
             try {
                 if (uri.scheme == "file") {
@@ -159,7 +162,7 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
                 )
             }
 
-            val derivedRoot = getRootPathFromTreeUri(ctx, treeUri)
+            val derivedRoot = overrideRootPath ?: getRootPathFromTreeUri(ctx, treeUri)
                 ?: return AuthorizationResult.Rejected(
                     if (isDebug) "Failed to derive file system path from SAF tree URI"
                     else "Authorization rejected: Access denied"

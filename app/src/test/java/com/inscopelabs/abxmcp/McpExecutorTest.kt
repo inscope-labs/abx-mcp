@@ -616,53 +616,54 @@ class McpExecutorTest {
             writeText("saf content")
         }
 
-        PolicyEngineImpl.isSafModeActive = true
-        PolicyEngineImpl.context = context
-        PolicyEngineImpl.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+        policyEngine.isSafModeActive = true
+        policyEngine.context = context
+        policyEngine.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+        policyEngine.overrideRootPath = tempDir.toFile().absolutePath
 
         val mockDocFile = MockDocumentFile(canReadVal = true, canWriteVal = true)
-        PolicyEngineImpl.documentFileResolver = { _, _ -> mockDocFile }
+        policyEngine.documentFileResolver = { _, _ -> mockDocFile }
 
-        // Create capability token with read permission
-        val safToken = Capability(
-            sessionId = "session_saf_revocation",
-            expiry = System.currentTimeMillis() + 3600_000,
-            allowedOperations = listOf("read_file"),
-            allowedRoots = emptyList(), // Not used under SAF mode
-            nonceSeed = "seed123"
-        )
+        try {
+            // Create capability token with read permission
+            val safToken = Capability(
+                sessionId = "session_saf_revocation",
+                expiry = System.currentTimeMillis() + 3600_000,
+                allowedOperations = listOf("read_file"),
+                allowedRoots = emptyList(), // Not used under SAF mode
+                nonceSeed = "seed123"
+            )
 
-        val readReq = JSONObject().apply {
-            put("method", "read_file")
-            put("params", JSONObject().apply {
-                put("path", testFile.absolutePath)
-            })
-        }.toString()
+            val readReq = JSONObject().apply {
+                put("method", "read_file")
+                put("params", JSONObject().apply {
+                    put("path", testFile.absolutePath)
+                })
+            }.toString()
 
-        // 1. Initial request: permission granted, must succeed
-        val firstRespStr = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
-        val firstResp = JSONObject(firstRespStr)
-        assertFalse(firstResp.getBoolean("isError"))
-        val contentArr = firstResp.getJSONArray("content")
-        val contentBase64 = contentArr.getJSONObject(0).getString("text")
-        val decodedText = String(Base64.decode(contentBase64, Base64.DEFAULT))
-        assertEquals("saf content", decodedText)
+            // 1. Initial request: permission granted, must succeed
+            val firstRespStr = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+            val firstResp = JSONObject(firstRespStr)
+            assertFalse(firstResp.getBoolean("isError"))
+            val result = firstResp.getJSONObject("result")
+            assertEquals("saf content", result.getString("content"))
 
-        // 2. Simulate live revocation: canReadVal changes to false
-        mockDocFile.canReadVal = false
+            // 2. Simulate live revocation: canReadVal changes to false
+            mockDocFile.canReadVal = false
 
-        // 3. Second request: permission revoked, must be rejected
-        val secondRespStr = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
-        val secondResp = JSONObject(secondRespStr)
-        assertTrue(secondResp.getBoolean("isError"))
-        val errorText = secondResp.getJSONArray("content").getJSONObject(0).getString("text")
-        assertTrue(errorText.contains("Authorization rejected") || errorText.contains("read permissions"))
-
-        // Cleanup
-        PolicyEngineImpl.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
-        PolicyEngineImpl.isSafModeActive = false
-        PolicyEngineImpl.context = null
-        PolicyEngineImpl.safTreeUri = null
+            // 3. Second request: permission revoked, must be rejected
+            val secondRespStr = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+            val secondResp = JSONObject(secondRespStr)
+            assertTrue(secondResp.getBoolean("isError"))
+            val errorText = secondResp.getJSONArray("content").getJSONObject(0).getString("text")
+            assertTrue(errorText.contains("Authorization rejected") || errorText.contains("read permissions"))
+        } finally {
+            policyEngine.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
+            policyEngine.isSafModeActive = false
+            policyEngine.context = null
+            policyEngine.safTreeUri = null
+            policyEngine.overrideRootPath = null
+        }
     }
 
     /**
@@ -675,51 +676,54 @@ class McpExecutorTest {
             writeText("drift content")
         }
 
-        PolicyEngineImpl.isSafModeActive = true
-        PolicyEngineImpl.context = context
-        PolicyEngineImpl.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+        policyEngine.isSafModeActive = true
+        policyEngine.context = context
+        policyEngine.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+        policyEngine.overrideRootPath = tempDir.toFile().absolutePath
 
         val mockDocFile = MockDocumentFile(canReadVal = true, canWriteVal = true)
         var callCount = 0
-        PolicyEngineImpl.documentFileResolver = { _, _ ->
+        policyEngine.documentFileResolver = { _, _ ->
             callCount++
             mockDocFile
         }
 
-        val safToken = Capability(
-            sessionId = "session_saf_drift",
-            expiry = System.currentTimeMillis() + 3600_000,
-            allowedOperations = listOf("read_file"),
-            allowedRoots = emptyList(),
-            nonceSeed = "seed123"
-        )
+        try {
+            val safToken = Capability(
+                sessionId = "session_saf_drift",
+                expiry = System.currentTimeMillis() + 3600_000,
+                allowedOperations = listOf("read_file"),
+                allowedRoots = emptyList(),
+                nonceSeed = "seed123"
+            )
 
-        val readReq = JSONObject().apply {
-            put("method", "read_file")
-            put("params", JSONObject().apply {
-                put("path", testFile.absolutePath)
-            })
-        }.toString()
+            val readReq = JSONObject().apply {
+                put("method", "read_file")
+                put("params", JSONObject().apply {
+                    put("path", testFile.absolutePath)
+                })
+            }.toString()
 
-        // Call execute
-        val resp1 = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
-        assertFalse(JSONObject(resp1).getBoolean("isError"))
+            // Call execute
+            val resp1 = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+            assertFalse(JSONObject(resp1).getBoolean("isError"))
 
-        // Verify that DocumentFile resolver was called
-        assertEquals(1, callCount)
+            // Verify that DocumentFile resolver was called
+            assertEquals(1, callCount)
 
-        // Call again to verify no cache is used
-        val resp2 = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
-        assertFalse(JSONObject(resp2).getBoolean("isError"))
+            // Call again to verify no cache is used
+            val resp2 = mcpExecutor.execute(readReq, safToken, SessionState.ACTIVE)
+            assertFalse(JSONObject(resp2).getBoolean("isError"))
 
-        // Verify it was called twice, proving zero caching of the SAF permission check
-        assertEquals(2, callCount)
-
-        // Cleanup
-        PolicyEngineImpl.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
-        PolicyEngineImpl.isSafModeActive = false
-        PolicyEngineImpl.context = null
-        PolicyEngineImpl.safTreeUri = null
+            // Verify it was called twice, proving zero caching of the SAF permission check
+            assertEquals(2, callCount)
+        } finally {
+            policyEngine.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
+            policyEngine.isSafModeActive = false
+            policyEngine.context = null
+            policyEngine.safTreeUri = null
+            policyEngine.overrideRootPath = null
+        }
     }
 
     /**
@@ -731,44 +735,100 @@ class McpExecutorTest {
             writeText("some content")
         }
 
-        PolicyEngineImpl.isSafModeActive = true
-        PolicyEngineImpl.context = context
-        PolicyEngineImpl.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+        policyEngine.isSafModeActive = true
+        policyEngine.context = context
+        policyEngine.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+        policyEngine.overrideRootPath = tempDir.toFile().absolutePath
 
         val mockDocFile = MockDocumentFile(canReadVal = true, canWriteVal = true)
-        PolicyEngineImpl.documentFileResolver = { _, _ -> mockDocFile }
+        policyEngine.documentFileResolver = { _, _ -> mockDocFile }
 
-        // SAF grant has write permissions, but the capability token ONLY has "write_file" allowed operations (no delete_file)
-        val writeOnlyToken = Capability(
-            sessionId = "session_saf_delete",
+        try {
+            // SAF grant has write permissions, but the capability token ONLY has "write_file" allowed operations (no delete_file)
+            val writeOnlyToken = Capability(
+                sessionId = "session_saf_delete",
+                expiry = System.currentTimeMillis() + 3600_000,
+                allowedOperations = listOf("write_file"),
+                allowedRoots = emptyList(),
+                nonceSeed = "seed123"
+            )
+
+            val deleteReq = JSONObject().apply {
+                put("method", "delete_file")
+                put("params", JSONObject().apply {
+                    put("path", testFile.absolutePath)
+                })
+            }.toString()
+
+            // Execute delete command, must be rejected because "delete_file" operation is not allowed on operation-tier
+            val respStr = mcpExecutor.execute(deleteReq, writeOnlyToken, SessionState.ACTIVE)
+            val resp = JSONObject(respStr)
+
+            assertTrue(resp.getBoolean("isError"))
+            val errorText = resp.getJSONArray("content").getJSONObject(0).getString("text")
+            assertTrue(errorText.contains("Authorization rejected") || errorText.contains("not in allowed operations"))
+
+            // Assert that the file is NOT deleted (remains intact)
+            assertTrue(testFile.exists())
+        } finally {
+            policyEngine.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
+            policyEngine.isSafModeActive = false
+            policyEngine.context = null
+            policyEngine.safTreeUri = null
+            policyEngine.overrideRootPath = null
+        }
+    }
+
+    /**
+     * New test: run two PolicyEngineImpl instances concurrently, one with SAF mode active and one without,
+     * and confirm they do not affect each other's authorization decisions.
+     */
+    @Test
+    fun testTwoPolicyEnginesConcurrentIsolation() {
+        val engineWithSaf = PolicyEngineImpl()
+        engineWithSaf.isSafModeActive = true
+        engineWithSaf.context = context
+        engineWithSaf.safTreeUri = "content://com.android.externalstorage.documents/tree/primary%3Amcp_fixture_tree"
+        engineWithSaf.overrideRootPath = tempDir.toFile().absolutePath
+        val mockDocFile = MockDocumentFile(canReadVal = true, canWriteVal = true)
+        engineWithSaf.documentFileResolver = { _, _ -> mockDocFile }
+
+        val engineWithoutSaf = PolicyEngineImpl()
+        engineWithoutSaf.isSafModeActive = false
+
+        // Create test file and capability tokens
+        val testFile = File(tempDir.toFile(), "concurrent_test.txt").apply {
+            writeText("concurrent content")
+        }
+
+        val safToken = Capability(
+            sessionId = "session_with_saf",
             expiry = System.currentTimeMillis() + 3600_000,
-            allowedOperations = listOf("write_file"),
-            allowedRoots = emptyList(),
+            allowedOperations = listOf("read_file"),
+            allowedRoots = emptyList(), // Not used under SAF mode
             nonceSeed = "seed123"
         )
 
-        val deleteReq = JSONObject().apply {
-            put("method", "delete_file")
-            put("params", JSONObject().apply {
-                put("path", testFile.absolutePath)
-            })
-        }.toString()
+        val nonSafToken = Capability(
+            sessionId = "session_without_saf",
+            expiry = System.currentTimeMillis() + 3600_000,
+            allowedOperations = listOf("read_file"),
+            allowedRoots = listOf(tempDir.toFile().absolutePath),
+            nonceSeed = "seed123"
+        )
 
-        // Execute delete command, must be rejected because "delete_file" operation is not allowed on operation-tier
-        val respStr = mcpExecutor.execute(deleteReq, writeOnlyToken, SessionState.ACTIVE)
-        val resp = JSONObject(respStr)
+        val request = com.inscopelabs.abxmcp.core.policy.Request(path = testFile.absolutePath, operation = "read_file")
 
-        assertTrue(resp.getBoolean("isError"))
-        val errorText = resp.getJSONArray("content").getJSONObject(0).getString("text")
-        assertTrue(errorText.contains("Authorization rejected") || errorText.contains("not in allowed operations"))
+        // 1. Check with SAF engine (should be Allowed since SAF is active and resolver permits it)
+        val resultSaf = engineWithSaf.authorize(request, safToken, SessionState.ACTIVE)
+        assertTrue(resultSaf is com.inscopelabs.abxmcp.core.policy.AuthorizationResult.Allowed)
 
-        // Assert that the file is NOT deleted (remains intact)
-        assertTrue(testFile.exists())
+        // 2. Check with non-SAF engine using safToken (should be Rejected because allowedRoots is empty)
+        val resultNonSafWithSafToken = engineWithoutSaf.authorize(request, safToken, SessionState.ACTIVE)
+        assertTrue(resultNonSafWithSafToken is com.inscopelabs.abxmcp.core.policy.AuthorizationResult.Rejected)
 
-        // Cleanup
-        PolicyEngineImpl.documentFileResolver = { ctx, uri -> DocumentFile.fromTreeUri(ctx, uri) }
-        PolicyEngineImpl.isSafModeActive = false
-        PolicyEngineImpl.context = null
-        PolicyEngineImpl.safTreeUri = null
+        // 3. Check with non-SAF engine using nonSafToken (should be Allowed because allowedRoots covers the path)
+        val resultNonSafWithNonSafToken = engineWithoutSaf.authorize(request, nonSafToken, SessionState.ACTIVE)
+        assertTrue(resultNonSafWithNonSafToken is com.inscopelabs.abxmcp.core.policy.AuthorizationResult.Allowed)
     }
 }
