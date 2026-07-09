@@ -57,4 +57,37 @@
     <string name="error_state_title">Secure Identity Initialization Failed</string>
     <string name="error_state_desc">The application was unable to establish a secure, hardware-backed identity key pair. This might occur if hardware cryptography is restricted or the secure enclave is temporarily locked.</string>
     <string name="btn_retry_initialization">Retry Initialization</string>
+
+    <!-- New UX Layer & M3 Navigation Strings -->
+    <string name="tab_connect">Connect</string>
+    <string name="tab_access">Access</string>
+    <string name="tab_activity">Activity</string>
+    <string name="tab_remove">Remove</string>
+
+    <string name="btn_start_session">Start Session</string>
+    <string name="btn_stop_session">Stop Session</string>
+    <string name="ttl_display">Time Remaining: %1$d seconds</string>
+    <string name="ttl_inactive">Session Inactive</string>
+    
+    <string name="policy_summary_title">Allowed Actions &amp; Folders</string>
+    <string name="policy_summary_desc">When a session is active, your authorized AI assistant is granted scoped permissions:</string>
+    <string name="policy_summary_details">✓ Read Files\n✓ Write &amp; Save Files\n\nAuthorized Directories:\n• Downloads (/storage/emulated/0/Download)\n• Documents (/storage/emulated/0/Documents)</string>
+    <string name="policy_inactive_desc">No active session. Your assistant has zero access to any files on this device.</string>
+    
+    <string name="advanced_toggle">Advanced Technical Details</string>
+    <string name="audit_title">Security Activity Logs</string>
+    <string name="audit_subtitle">Chronological ledger of security policy validations and unauthorized block events.</string>
+    <string name="audit_empty">No security block events or rejections recorded yet.</string>
+    <string name="audit_integrity_valid">Log Chain Integrity: SECURE (Hardware Key Attested)</string>
+    <string name="audit_integrity_invalid">Log Chain Integrity: CORRUPTED / TAMPERED</string>
+    
+    <string name="uninstall_instructions_title">Uninstalling ABC Server</string>
+    <string name="uninstall_instructions_desc">To fully and permanently remove all data from ABC Server, simply uninstall the application.\n\nUnder Android\'s File-Based Encryption (FBE) model, all isolated credentials, in-memory states, sandbox files, and log databases are completely and irrecoverably purged from hardware memory upon uninstallation.</string>
+    <string name="clear_explanation">You can also manually wipe the security key pair immediately using the button below. This instantly invalidates any currently issued capability tokens and prevents any future authorization checks.</string>
+    <string name="btn_clear_data">Deconstruct Secure Identity Now</string>
+    
+    <string name="mock_pairing_button">Simulate Gateway Enrollment</string>
+    <string name="mock_pairing_title">Mock Gateway Enrollment</string>
+    <string name="mock_pairing_prompt">Enter gateway pairing token or click Enroll:</string>
+    <string name="dialog_enroll_success">Device enrolled and paired successfully!</string>
 </resources>

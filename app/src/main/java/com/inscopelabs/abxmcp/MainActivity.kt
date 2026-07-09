@@ -39,6 +39,9 @@ class MainActivity : ComponentActivity() {
     }
     
     val keyStoreManager = KeyStoreManager(applicationContext)
+    
+    // Wire AuditLog on app startup before any session or policy engine logic executes
+    com.inscopelabs.abxmcp.core.audit.AuditLog.initialize(applicationContext, keyStoreManager)
 
     setContent {
       MyApplicationTheme {
