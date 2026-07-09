@@ -19,6 +19,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(project(":core:audit"))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
 }

@@ -3,7 +3,7 @@ package com.inscopelabs.abxmcp.core.session
 data class Nonce(val value: String)
 
 interface ReplayProtection {
-    fun validateRequest(nonce: Nonce, timestampMs: Long, currentTimeMs: Long): ValidationResult
+    fun validateRequest(nonce: Nonce, timestampMs: Long, currentTimeMs: Long, sessionId: String = "unknown"): ValidationResult
     fun reset()
     fun getSeenNonces(): Set<Nonce>
     fun getLastTimestamp(): Long

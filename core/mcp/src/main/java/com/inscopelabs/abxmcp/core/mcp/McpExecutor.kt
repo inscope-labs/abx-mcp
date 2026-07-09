@@ -1,6 +1,8 @@
 package com.inscopelabs.abxmcp.core.mcp
 
 import android.util.Base64
+import com.inscopelabs.abxmcp.core.audit.AuditLog
+import com.inscopelabs.abxmcp.core.audit.ReasonCode
 import com.inscopelabs.abxmcp.core.policy.Capability
 import com.inscopelabs.abxmcp.core.policy.PolicyEngine
 import com.inscopelabs.abxmcp.core.policy.Request as PolicyRequest
@@ -58,6 +60,7 @@ class McpExecutor(
 
             val path = paramsObj.optString("path", "")
             if (path.isEmpty()) {
+                AuditLog.recordRejection(ReasonCode.PATH_OUT_OF_BOUNDS, token.sessionId, "Path parameter is missing in execute request")
                 return errorResponse(reqId, "Invalid request: 'path' parameter is missing", isMcpStyle = true)
             }
 
@@ -72,6 +75,7 @@ class McpExecutor(
                 "append_file", "append" -> "append_file"
                 "delete_file", "delete" -> "delete_file"
                 else -> {
+                    AuditLog.recordRejection(ReasonCode.OP_NOT_ALLOWED, token.sessionId, "Unknown method or operation: $method")
                     return errorResponse(reqId, "Unknown method or operation: $method", isMcpStyle = true)
                 }
             }
@@ -185,6 +189,7 @@ class McpExecutor(
             return responseJson.toString()
 
         } catch (e: Exception) {
+            AuditLog.recordRejection(ReasonCode.OP_NOT_ALLOWED, token.sessionId, "Exception during execution: ${e.message}")
             return errorResponse(reqId, "Exception during execution: ${e.message}", isMcpStyle = true)
         }
     }

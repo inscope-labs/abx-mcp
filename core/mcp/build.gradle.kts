@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(project(":core:policy"))
     implementation(project(":core:session"))
+    implementation(project(":core:audit"))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
 }

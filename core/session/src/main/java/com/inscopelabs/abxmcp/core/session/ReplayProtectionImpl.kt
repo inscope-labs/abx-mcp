@@ -1,5 +1,7 @@
 package com.inscopelabs.abxmcp.core.session
 
+import com.inscopelabs.abxmcp.core.audit.AuditLog
+import com.inscopelabs.abxmcp.core.audit.ReasonCode
 import java.util.Collections
 
 class ReplayProtectionImpl(
@@ -13,23 +15,27 @@ class ReplayProtectionImpl(
     override fun validateRequest(
         nonce: Nonce,
         timestampMs: Long,
-        currentTimeMs: Long
+        currentTimeMs: Long,
+        sessionId: String
     ): ValidationResult {
         // 1. Check session state first. Must be ACTIVE
         val state = sessionManager.getState()
         if (state !is SessionState.ACTIVE) {
+            AuditLog.recordRejection(ReasonCode.SESSION_EXPIRED, sessionId, "Session is not active (state: $state)")
             return ValidationResult.InvalidSessionState(state)
         }
 
         // 2. Boundary check: Send a request with timestamp exactly 1ms outside the acceptable window (configurable, e.g., 30 seconds). Must reject.
         val diff = Math.abs(currentTimeMs - timestampMs)
         if (diff > windowSizeMs) {
+            AuditLog.recordRejection(ReasonCode.SESSION_EXPIRED, sessionId, "Outside timestamp window: diff is $diff ms")
             return ValidationResult.OutsideTimestampWindow(diff)
         }
 
         synchronized(seenNoncesMap) {
             // 3. Nonce check: duplicate nonce check
             if (seenNoncesMap.containsKey(nonce)) {
+                AuditLog.recordRejection(ReasonCode.REPLAY_DETECTED, sessionId, "Duplicate nonce: ${nonce.value}")
                 return ValidationResult.DuplicateNonce
             }
 

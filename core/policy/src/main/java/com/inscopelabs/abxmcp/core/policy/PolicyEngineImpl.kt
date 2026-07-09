@@ -1,5 +1,7 @@
 package com.inscopelabs.abxmcp.core.policy
 
+import com.inscopelabs.abxmcp.core.audit.AuditLog
+import com.inscopelabs.abxmcp.core.audit.ReasonCode
 import com.inscopelabs.abxmcp.core.session.SessionState
 import java.io.File
 import java.text.Normalizer
@@ -72,6 +74,7 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
     ): AuthorizationResult {
         // 1. Check if the session is ACTIVE
         if (currentState !is SessionState.ACTIVE) {
+            AuditLog.recordRejection(ReasonCode.SESSION_EXPIRED, token.sessionId, "Session is not active (state: $currentState)")
             return AuthorizationResult.Rejected(
                 if (isDebug) "Session is not active (current state: $currentState)"
                 else "Authorization rejected: Access denied"
@@ -80,6 +83,7 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
 
         // 2. Reject any non-file schemes (e.g. content://)
         if (request.path.startsWith("content://") || request.path.contains("://")) {
+            AuditLog.recordRejection(ReasonCode.PATH_OUT_OF_BOUNDS, token.sessionId, "Non-file scheme requested: ${request.path}")
             return AuthorizationResult.Rejected(
                 if (isDebug) "Non-file schemes (such as content://) are explicitly rejected by PolicyEngine"
                 else "Authorization rejected: Access denied"
@@ -88,6 +92,7 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
 
         // 3. Check if the capability token itself has expired based on system clock
         if (System.currentTimeMillis() > token.expiry) {
+            AuditLog.recordRejection(ReasonCode.SESSION_EXPIRED, token.sessionId, "Capability token has expired")
             return AuthorizationResult.Rejected(
                 if (isDebug) "Capability token has expired"
                 else "Authorization rejected: Access denied"
@@ -96,6 +101,9 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
 
         // 4. Check operation granularity
         if (!token.allowedOperations.contains(request.operation)) {
+            val isTierViolation = (request.operation == "delete_file" && !token.allowedOperations.contains("delete_file"))
+            val code = if (isTierViolation) ReasonCode.TIER_VIOLATION else ReasonCode.OP_NOT_ALLOWED
+            AuditLog.recordRejection(code, token.sessionId, "Operation '${request.operation}' is not in allowed operations: ${token.allowedOperations}")
             return AuthorizationResult.Rejected(
                 if (isDebug) "Operation '${request.operation}' is not in allowed operations: ${token.allowedOperations}"
                 else "Authorization rejected: Access denied"
@@ -106,6 +114,7 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
         val canonicalReqPath = try {
             File(request.path).canonicalPath
         } catch (e: Exception) {
+            AuditLog.recordRejection(ReasonCode.PATH_OUT_OF_BOUNDS, token.sessionId, "Failed to canonicalize requested path: ${e.message}")
             return AuthorizationResult.Rejected(
                 if (isDebug) "Failed to canonicalize requested path: ${e.message}"
                 else "Authorization rejected: Access denied"
@@ -121,22 +130,30 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
 
         // 6. Compare against allowed roots / SAF derived root
         if (isSafModeActive) {
-            val ctx = context ?: return AuthorizationResult.Rejected(
-                if (isDebug) "Context is null for SAF mode"
-                else "Authorization rejected: Access denied"
-            )
-            val uriStr = safTreeUri ?: return AuthorizationResult.Rejected(
-                if (isDebug) "SAF tree URI is null"
-                else "Authorization rejected: Access denied"
-            )
+            val ctx = context ?: run {
+                AuditLog.recordRejection(ReasonCode.SAF_REVOKED, token.sessionId, "Context is null for SAF mode")
+                return AuthorizationResult.Rejected(
+                    if (isDebug) "Context is null for SAF mode"
+                    else "Authorization rejected: Access denied"
+                )
+            }
+            val uriStr = safTreeUri ?: run {
+                AuditLog.recordRejection(ReasonCode.SAF_REVOKED, token.sessionId, "SAF tree URI is null")
+                return AuthorizationResult.Rejected(
+                    if (isDebug) "SAF tree URI is null"
+                    else "Authorization rejected: Access denied"
+                )
+            }
             val treeUri = android.net.Uri.parse(uriStr)
             
-            // Call live live to derive the root and check permissions (no caching beyond current request)
-            val documentFile = documentFileResolver(ctx, treeUri)
-                ?: return AuthorizationResult.Rejected(
+            // Call live to derive the root and check permissions (no caching beyond current request)
+            val documentFile = documentFileResolver(ctx, treeUri) ?: run {
+                AuditLog.recordRejection(ReasonCode.SAF_REVOKED, token.sessionId, "Failed to resolve SAF DocumentFile")
+                return AuthorizationResult.Rejected(
                     if (isDebug) "Failed to resolve SAF DocumentFile"
                     else "Authorization rejected: Access denied"
                 )
+            }
 
             val isReadOp = listOf("read_file", "list_directory", "file_exists", "get_file_metadata", "get_file_version")
                 .contains(request.operation)
@@ -144,33 +161,39 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
             val isDeleteOp = (request.operation == "delete_file")
 
             if (isReadOp && !documentFile.canRead()) {
+                AuditLog.recordRejection(ReasonCode.SAF_REVOKED, token.sessionId, "SAF tree does not have read permissions")
                 return AuthorizationResult.Rejected(
                     if (isDebug) "SAF tree does not have read permissions"
                     else "Authorization rejected: Access denied"
                 )
             }
             if (isWriteOp && !documentFile.canWrite()) {
+                AuditLog.recordRejection(ReasonCode.SAF_REVOKED, token.sessionId, "SAF tree does not have write permissions")
                 return AuthorizationResult.Rejected(
                     if (isDebug) "SAF tree does not have write permissions"
                     else "Authorization rejected: Access denied"
                 )
             }
             if (isDeleteOp && !documentFile.canWrite()) {
+                AuditLog.recordRejection(ReasonCode.SAF_REVOKED, token.sessionId, "SAF tree does not have write permissions needed for delete")
                 return AuthorizationResult.Rejected(
                     if (isDebug) "SAF tree does not have write permissions needed for delete"
                     else "Authorization rejected: Access denied"
                 )
             }
 
-            val derivedRoot = overrideRootPath ?: getRootPathFromTreeUri(ctx, treeUri)
-                ?: return AuthorizationResult.Rejected(
+            val derivedRoot = overrideRootPath ?: getRootPathFromTreeUri(ctx, treeUri) ?: run {
+                AuditLog.recordRejection(ReasonCode.SAF_REVOKED, token.sessionId, "Failed to derive file system path from SAF tree URI")
+                return AuthorizationResult.Rejected(
                     if (isDebug) "Failed to derive file system path from SAF tree URI"
                     else "Authorization rejected: Access denied"
                 )
+            }
 
             val canonicalRootPath = try {
                 File(derivedRoot).canonicalPath
             } catch (e: Exception) {
+                AuditLog.recordRejection(ReasonCode.PATH_OUT_OF_BOUNDS, token.sessionId, "Failed to canonicalize derived root path: ${e.message}")
                 return AuthorizationResult.Rejected(
                     if (isDebug) "Failed to canonicalize derived root path: ${e.message}"
                     else "Authorization rejected: Access denied"
@@ -187,6 +210,7 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
             if (cleanReq == cleanRoot || cleanReq.startsWith(cleanRoot + File.separator)) {
                 return AuthorizationResult.Allowed(cleanReq)
             } else {
+                AuditLog.recordRejection(ReasonCode.PATH_OUT_OF_BOUNDS, token.sessionId, "Path '${request.path}' is outside SAF derived root: $cleanRoot")
                 return AuthorizationResult.Rejected(
                     if (isDebug) "Path '${request.path}' (canonicalized: '$canonicalReqPath') is outside SAF derived root: $cleanRoot"
                     else "Authorization rejected: Access denied"
@@ -217,6 +241,7 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
             }
 
             if (!isAllowedPath) {
+                AuditLog.recordRejection(ReasonCode.PATH_OUT_OF_BOUNDS, token.sessionId, "Path '${request.path}' is outside allowed roots: ${token.allowedRoots}")
                 return AuthorizationResult.Rejected(
                     if (isDebug) "Path '${request.path}' (canonicalized: '$canonicalReqPath') is outside allowed roots: ${token.allowedRoots}"
                     else "Authorization rejected: Access denied"
