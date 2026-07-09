@@ -1,6 +1,6 @@
 # ABC Server (Auto Bridge Context Server)
 
-ABC Server is a native Android security client implementing the ABC Server architecture (Specification Revision 3.0). It provides a hardware-backed, session-gated, capability-scoped bridge between an on-device Model Context Protocol (MCP) tool runtime and the local filesystem, with full append-only cryptographically signed audit logging.
+ABC Server is a native Android security client implementing the ABC Server architecture (Specification Revision 3.0). It provides a hardware-backed, session-gated, capability-scoped bridge between an on-device Model Context Protocol (MCP) tool runtime and the local filesystem, with append-only cryptographically signed audit logging of security and policy rejections.
 
 The internal Kotlin package structure uses the namespace `com.inscopelabs.abxmcp` as an internal codename and package identifier, while all user-facing surfaces and external references are fully branded as **ABC Server**.
 
@@ -26,7 +26,7 @@ The architecture is split into clean, single-responsibility modules:
 | `:core:policy` | Authorization rules, path resolution/normalization, and allowed directory root matching. |
 | `:core:filesystem` | Safe file access operations interacting directly with the filesystem. |
 | `:core:mcp` | Model Context Protocol tool execution, request validation, and JSON RPC parsers. |
-| `:core:audit` | Append-only, hash-chained, and signed audit logging for all filesystem operations. |
+| `:core:audit` | Append-only, hash-chained, and signed audit logging of policy rejections and unauthorized access attempts. |
 
 ## Building & Installation
 
@@ -50,11 +50,17 @@ The continuous integration pipeline is defined in `.github/workflows/build.yml`.
 
 This project has completed all core development and remediation phases:
 
-- **Phases 1-5**: Core functional implementation of key management, local session gating, `cloudflared` tunnel lifecycle, policy validation, MCP JSON-RPC executors, and cryptographically chained audit logging.
+- **Phases 1-5**: Core functional implementation of key management, local session gating, `cloudflared` tunnel lifecycle, policy validation, and initial architectural modules.
+- **Phase 6.1 (Keystore & Attestation Integrity Remediation)**: Removed reflection key-unwrapping, decoupled fingerprint sniffing, and protected private keys using an encapsulated signature lambda.
+- **Phase 6.2 (Session State Correctness Remediation)**: Fixed state reactivation TTL reset and restricted starting transitions to local button presses.
 - **Phase 6.3 (Tunnel Lifecycle Truthfulness Remediation)**: Removed silent run fallbacks; implemented real binary checking on `libcloudflared.so` using ELF magic headers.
 - **Phase 6.4 (Path Semantics & Replay Hardening Remediation)**: Prevented TOCTOU symlink-swapping attacks by passing authorized canonical paths from the Policy Engine directly to raw I/O readers; explicitly rejected non-file schemes (e.g., `content://`); implemented bounded-memory concurrent nonce caching.
 - **Phase 6.5 (Manifest & Permission Correctness)**: Added explicit manifest declarations for `INTERNET` and `POST_NOTIFICATIONS`; introduced an API 33+ dynamic permission request flow with graceful non-blocking behavior.
 - **Phase 6.6 (Branding & Documentation Consistency)**: Rebranded all user-facing strings, notifications, clipboard formats, and titles to **ABC Server**.
+- **Phase 7 (MCP Protocol Execution)**: Fully realized the Model Context Protocol (MCP) JSON-RPC executor supporting standard actions (`file_exists`, `get_file_metadata`, `read_file`, `list_directory`).
+- **Phase 8 (Safe Filesystem Writes & Tier Gating)**: Implemented interruptible atomic filesystem writes using `.tmp` buffers and atomic renames (`java.nio.file.Files.move`), and added strict operation tier/permission checks under SAF.
+- **Phase T (Transport Layer Refactor)**: Abstracted connection mechanisms into a generic `TransportProvider` with standard `WebSocketTransport` and test-friendly `FakeTransportProvider` implementations.
+- **Phase 9 (Audit Logging Service)**: Integrated hardware-signed, cryptographically chained, append-only local audit logs capturing unauthorized access, policy failures, and status rejections.
 
 ## Testing
 

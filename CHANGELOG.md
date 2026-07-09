@@ -2,6 +2,29 @@
 
 All notable changes to the ABC Server security client will be documented in this file.
 
+## [2.0.0] - 2026-07-09
+
+### Added
+- **Phase 7: MCP Protocol Execution**:
+  - Implemented the complete Model Context Protocol (MCP) JSON-RPC executor in `:core:mcp`.
+  - Added robust RPC message parsing and validation for core filesystem operations: `file_exists`, `get_file_metadata`, `get_file_version`, `read_file`, and `list_directory`.
+  - Introduced standard error mappings for policy and validation failures.
+- **Phase 8: High-Integrity Filesystem Operations**:
+  - Implemented safe atomic write operations in `FileSystemReaderImpl` using parent-adjacent `.tmp` buffers and robust atomic rename fallbacks (`java.nio.file.Files.move`).
+  - Added full interruption support to abort long-running write loops gracefully if a thread is interrupted.
+  - Implemented tier-based capability gating (distinguishing read vs. write vs. delete permissions) under raw file systems and SAF (Storage Access Framework) URI mounts.
+  - Added live evaluation checks to reject operations immediately if SAF persistent read/write permissions drift or get revoked by the OS.
+- **Phase T: Transport Layer Abstraction**:
+  - Refactored raw socket and client tunnel communication inside `:core:tunnel` into a clean, testable `TransportProvider` abstraction.
+  - Provided `WebSocketTransport` implementing standard production connection handlers.
+  - Created a robust `FakeTransportProvider` test seam to simulate network packet injections and sudden connection drops.
+- **Phase 9: Hardware-Signed Append-Only Audit Logging**:
+  - Implemented a complete append-only, hash-chained JSON Lines (`.jsonl`) audit trail in `:core:audit` logging all policy and security rejections (`ReasonCode`).
+  - Added secure cryptographic signing of the chain head inside the Android KeyStore using the non-exportable hardware EC key pair.
+  - Implemented full chain integrity validation (`verifyIntegrity`) using SHA-256 hash chains.
+  - Remediated production startup wiring by creating `McpApplication` and initializing the global `AuditLog` context on app startup.
+  - Added Robolectric process restart simulation tests to verify the audit log survives app process restarts.
+
 ## [1.5.0] - 2026-07-08
 
 ### Added

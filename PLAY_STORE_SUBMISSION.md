@@ -26,17 +26,17 @@ This declaration lists all data types collected or processed by ABC Server, thei
     *   **Purpose:** Session security, integrity checks, and token authentication.
     *   **Sharing:** **Never shared with third parties.**
 3.  **App Logs & Diagnostics (Local Audit Trail):**
-    *   **Description:** Writes an append-only, cryptographically signed hash-chain of all local filesystem read operations.
+    *   **Description:** Writes an append-only, cryptographically signed hash-chain of all security policy rejections, unauthorized access attempts, and session status failures.
     *   **Purpose:** User auditability and compliance tracking.
     *   **Sharing:** **Never shared with third parties. Stored strictly on-device.**
 
 ### Encryption and Security
 *   **In Transit:** All external traffic is routed through an end-to-end encrypted `cloudflared` tunnel, secured using Transport Layer Security (TLS 1.3). No plain-text data leaves the device.
-*   **At Rest:** All audit trails, session states, and configuration data are stored in a sandboxed SQLite (Room) database, protected by Android's File-Based Encryption (FBE). Keys are protected inside the secure enclave (TEE/StrongBox) and are non-exportable.
+*   **At Rest:** All audit trails are stored strictly inside a sandboxed JSON Lines (`.jsonl`) file, and active session states are maintained in-memory, all protected inside the application's private files directory by Android's File-Based Encryption (FBE). Keys are protected inside the secure enclave (TEE/StrongBox) and are non-exportable.
 
 ### Data Deletion
 *   **Uninstall Purge:** All keys, databases, session state, cached configurations, and audit trails are completely and automatically destroyed by the Android operating system when the user uninstalls the application.
-*   **In-App Purge:** Users can manually clear the active session, invalidate all capability tokens, and clear all audit trails from the Enrollment Screen at any time.
+*   **In-App Purge:** Users can manually delete their cryptographic enrollment keys from the Enrollment Screen at any time, instantly preventing future capability token signature verification and effectively invalidating all issued capabilities.
 
 ---
 
@@ -53,14 +53,14 @@ ABC Server ("we", "us", or "our") is a developer security tool designed to act a
 #### Data We Access (On-Device Only)
 1.  **Local Filesystem:** We only access the directories you explicitly approve via your cryptographically signed Capability Tokens.
 2.  **Hardware Enclave (Android KeyStore):** We utilize the hardware-backed Trusted Execution Environment (TEE) or StrongBox to generate non-exportable signature keys. These keys never leave your device.
-3.  **Local Audit Trail:** A signed, append-only ledger of file reads is stored strictly inside the app's sandboxed database to let you monitor agent access.
+3.  **Local Audit Trail:** A signed, append-only ledger of security policy rejections and unauthorized access attempts is stored strictly in a local file inside the app's secure sandbox directory.
 
 #### Data Transit
 ABC Server does not run a central cloud service, nor does it collect, harvest, or aggregate your files or keys. Any data transmitted to an external MCP client is routed through a secure, end-to-end encrypted tunnel (`cloudflared`) managed directly under your account credentials. We have no visibility into the payload, metadata, or contents of these tunnels.
 
 #### User Consent and Security Controls
 *   **Explicit Session Gating:** ABC Server cannot process any request unless a physical user-gesture (e.g., button press) explicitly starts or extends the active session.
-*   **Scope Invalidation:** You can instantly revoke all capabilities, wipe keys, and delete the audit trail with a single tap in the app.
+*   **Scope Invalidation:** You can instantly delete your enrollment keys with a single tap in the app, preventing verification of any issued capability tokens.
 
 #### Changes to This Policy
 We may update this privacy policy from time to time to reflect security improvements or specification updates.
@@ -107,11 +107,11 @@ These arguments are prepared for the Google Play Console's declaration forms.
     ■ TOCTOU SYMLINK & SCHEME PROTECTION
     Engineered with strict Time-of-Check to Time-of-Use defenses. Normalizes and validates canonical paths before execution to prevent path traversal exploits, directory escaping, symlink-swapping attacks, or content:// URI leaks.
 
-    ■ HARDENED REPLAY DEFENES
+    ■ HARDENED REPLAY DEFENSES
     Protected by synchronized timestamp-based nonce tracking, utilizing a bounded-memory concurrent cache to filter duplicate requests and defend against session replay attacks.
 
     ■ AUDIT LOGS
-    Keeps an append-only, signed, hash-chained local audit trail of all file read operations, guaranteeing total, immutable user-auditability over what files have been accessed by external models.
+    Keeps an append-only, signed, hash-chained local audit trail of all security policy rejections and unauthorized access attempts, guaranteeing total, immutable user-auditability over what security violations have occurred.
 
     Bridge the power of the Model Context Protocol to your local environment without compromising on core device security.
 
