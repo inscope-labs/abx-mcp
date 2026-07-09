@@ -7,6 +7,7 @@ jobs:
   release:
     name: Build & Sign AAB
     runs-on: ubuntu-latest
+    environment: ENV_ABX_MCP
 
     steps:
       - name: Checkout Code
