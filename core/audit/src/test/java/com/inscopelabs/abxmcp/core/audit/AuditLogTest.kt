@@ -188,4 +188,34 @@ class AuditLogTest {
 
         assertTrue("Cryptographic signature over the chain head is invalid", isVerified)
     }
+
+    @Test
+    fun testAuditLogPersistenceAcrossProcessRestart() {
+        // 1. Setup entries with log file
+        AuditLog.recordRejection(ReasonCode.SESSION_EXPIRED, "session-abc", "Rejection 1")
+        AuditLog.recordRejection(ReasonCode.REPLAY_DETECTED, "session-abc", "Rejection 2")
+
+        val initialEntries = AuditLog.getEntries()
+        assertEquals(2, initialEntries.size)
+        assertEquals("Rejection 1", initialEntries[0].getString("details"))
+        assertEquals("Rejection 2", initialEntries[1].getString("details"))
+
+        val firstHashBeforeRestart = AuditLog.getLastHash()
+
+        // 2. Discard the AuditLog's in-memory references to simulate process death
+        AuditLog.simulateProcessDeathForTest()
+
+        // 3. Re-initialize with the same file to simulate app startup loading the existing log file
+        AuditLog.setLogFileForTest(logFile)
+
+        // 4. Confirm the log entries survived the "restart" and match exactly what was written before
+        val postRestartEntries = AuditLog.getEntries()
+        assertEquals(2, postRestartEntries.size)
+        assertEquals("Rejection 1", postRestartEntries[0].getString("details"))
+        assertEquals("Rejection 2", postRestartEntries[1].getString("details"))
+
+        // Also confirm the hash chain integrity is perfectly preserved and recomputed hashes are identical
+        assertEquals(firstHashBeforeRestart, AuditLog.getLastHash())
+        assertTrue(AuditLog.verifyIntegrity())
+    }
 }

@@ -47,6 +47,14 @@ object AuditLog {
         inMemoryEntries.clear()
     }
 
+    @Synchronized
+    fun simulateProcessDeathForTest() {
+        this.logFile = null
+        this.keyStoreManager = null
+        this.inMemoryEntries.clear()
+        this.initialized = false
+    }
+
     /**
      * Formats a log entry deterministically to ensure consistent hash calculations.
      */
