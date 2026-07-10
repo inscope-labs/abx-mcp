@@ -11,6 +11,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -186,7 +189,8 @@ fun EnrollmentScreen(
     }
 
     // Main App Bar and Adaptive Layout Container
-    Scaffold(
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(
         topBar = {
             TopAppBar(
                 title = {
@@ -388,9 +392,9 @@ fun EnrollmentScreen(
         }
     }
 
-    // About / Help Dialog
+    // About / Help Dialog as custom overlay modal to ensure 100% platform-agnostic rendering and testability
     if (showAboutDialog) {
-        AlertDialog(
+        CustomModalDialog(
             onDismissRequest = { showAboutDialog = false },
             icon = {
                 Icon(
@@ -485,9 +489,9 @@ fun EnrollmentScreen(
         )
     }
 
-    // Mock Gateway Enrollment Dialog
+    // Mock Gateway Enrollment Dialog as custom overlay modal to ensure 100% platform-agnostic rendering and testability
     if (showPairingDialog) {
-        AlertDialog(
+        CustomModalDialog(
             onDismissRequest = { showPairingDialog = false },
             title = {
                 Text(
@@ -543,6 +547,7 @@ fun EnrollmentScreen(
                 }
             }
         )
+    }
     }
 }
 
@@ -1734,4 +1739,79 @@ fun getTruncatedFingerprint(fp: String): String {
     val lastSecondPart = fp.substring(fp.length - 8, fp.length - 4)
     val lastPart = fp.takeLast(4)
     return "$firstPart • $secondPart • ... • $lastSecondPart • $lastPart"
+}
+
+@Composable
+fun CustomModalDialog(
+    onDismissRequest: () -> Unit,
+    icon: @Composable (() -> Unit)? = null,
+    title: @Composable () -> Unit,
+    text: @Composable () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    dismissButton: @Composable (() -> Unit)? = null
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        // Scrim background area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.6f))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) {
+                    onDismissRequest()
+                }
+        )
+
+        // Dialog content card
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            tonalElevation = 6.dp,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .padding(24.dp)
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = {} // Consume click inside dialog
+                )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (icon != null) {
+                    Box(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                        icon()
+                    }
+                }
+
+                Box(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    title()
+                }
+
+                Box(modifier = Modifier.align(Alignment.Start)) {
+                    text()
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (dismissButton != null) {
+                        dismissButton()
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    confirmButton()
+                }
+            }
+        }
+    }
 }
