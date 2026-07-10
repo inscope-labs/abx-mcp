@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - ABC Server (ABX-MCP)</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --border-color: #e2e8f0;
+            --accent-bg: #eff6ff;
+            --accent-text: #1e40af;
+            --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --card-bg: #1e293b;
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+                --primary-color: #3b82f6;
+                --primary-hover: #60a5fa;
+                --border-color: #334155;
+                --accent-bg: #1e3a8a;
+                --accent-text: #93c5fd;
+            }
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .brand-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin: 0 0 10px 0;
+            letter-spacing: -0.025em;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .last-updated {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        h2:first-of-type {
+            margin-top: 0;
+        }
+
+        p, li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        ul {
+            padding-left: 24px;
+            margin-bottom: 24px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .highlight-box {
+            background-color: var(--accent-bg);
+            border-left: 4px solid var(--primary-color);
+            color: var(--accent-text);
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 24px 0;
+        }
+
+        .highlight-box p {
+            color: inherit;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .placeholder-note {
+            background-color: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #78350f;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 0.875rem;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .placeholder-note {
+                background-color: #78350f;
+                border: 1px solid #d97706;
+                color: #fef3c7;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="brand-title">ABC Server</h1>
+            <p class="subtitle">Auto Bridge Context Server (ABX-MCP)</p>
+            <div class="last-updated">Last Updated: July 10, 2026</div>
+        </div>
+
+        <div class="card">
+            <h2>1. Introduction</h2>
+            <p>
+                Welcome to **ABC Server** (internally referred to as ABX-MCP), a native Android application designed to act as a secure, hardware-backed, session-gated, and capability-scoped bridge between Model Context Protocol (MCP) clients and the local Android filesystem. 
+            </p>
+            <p>
+                Your privacy and security are the foundational pillars of our software design. This Privacy Policy outlines precisely how we handle access to your device, how cryptographic keys are managed, and how we ensure your data never leaves your control.
+            </p>
+
+            <div class="highlight-box">
+                <p>
+                    <strong>Core Invariant:</strong> ABC Server is an offline-first, local-only application. We do not operate secondary backend servers, track your behavior, or collect and transmit any data to third parties.
+                </p>
+            </div>
+
+            <h2>2. No Collection of Personal Data</h2>
+            <p>
+                We do not collect, store, upload, or transmit any of your personal information, telemetry, usage statistics, or device logs. All data processing remains strictly local to your physical Android device. Specifically:
+            </p>
+            <ul>
+                <li><strong>Filesystem Data:</strong> Any access, read, or write operation performed on files and directories on your device occurs entirely locally. Files are parsed by the on-device MCP executor and transmitted directly and exclusively to the specific MCP client you have securely paired with.</li>
+                <li><strong>Cryptographic Keys:</strong> Cryptographic material and hardware-backed attestation keys are securely generated inside the Android KeyStore System (using TEE/StrongBox where available). These keys are strictly non-exportable and never leave the device.</li>
+                <li><strong>Session Tokens:</strong> Temporary tokens used to gate and authorize active MCP client sessions are stored transiently in local, on-device memory and automatically expire when a session terminates.</li>
+            </ul>
+
+            <h2>3. Secure Gating & User Consent</h2>
+            <p>
+                ABC Server does not allow silent, remote, or automatic background connections. The application enforces a strict security posture requiring direct, physical human gesture approval to initiate or extend any bridge connection:
+            </p>
+            <ul>
+                <li>Connections must be authorized via explicit interaction with the local on-device UI (such as physical button presses).</li>
+                <li>Active connections are clearly surfaced in the system drawer using a persistent Foreground Service notification, so you always know when a bridge is live.</li>
+                <li>The bridge enforces strict time-to-live (TTL) countdowns, shutting down communication interfaces automatically upon expiry unless manually renewed.</li>
+            </ul>
+
+            <h2>4. Permissions Used & Purpose</h2>
+            <p>
+                The application requests specific standard Android permissions to fulfill its technical role:
+            </p>
+            <ul>
+                <li><strong>INTERNET:</strong> Required to establish local websocket or secure tunnel network socket connections to paired MCP client tools. No arbitrary outbound surfing or tracking occurs under this permission.</li>
+                <li><strong>POST_NOTIFICATIONS:</strong> Required on Android 13+ (API 33) to display the live foreground status notification of active server sessions, ensuring visual transparency.</li>
+                <li><strong>Storage Access / SAF (Storage Access Framework):</strong> Requested dynamically during runtime when you configure directory allowed roots to authorize access to specific folders. The application can only interact with files in folders you have explicitly designated.</li>
+            </ul>
+
+            <h2>5. Audit Logging</h2>
+            <p>
+                To provide security transparency and diagnostics, the application generates append-only, hash-chained, and local-key-signed audit logs tracking security events (such as policy rejections, unauthorized access attempts, or session violations). These logs are stored strictly on-device, are not shared with any external parties, and are under your complete control.
+            </p>
+
+            <h2>6. Changes to This Policy</h2>
+            <p>
+                We may update our Privacy Policy from time to time. Any changes will be posted by updating this static page. You are advised to review this page periodically for any changes.
+            </p>
+
+            <h2>7. Contact Us</h2>
+            <p>
+                If you have any questions or concerns about this Privacy Policy, please feel free to reach out to us at:
+            </p>
+            
+            <div class="placeholder-note">
+                <strong>[ACTION REQUIRED]</strong> Please replace this placeholder email address in the static HTML file with your preferred contact information prior to publishing if this is not the address you wish to show publicly.
+            </div>
+
+            <p>
+                <strong>Email:</strong> <a href="mailto:afterdawn.service@gmail.com">afterdawn.service@gmail.com</a>
+            </p>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 ABC Server. All rights reserved.
+        </div>
+    </div>
+</body>
+</html>
