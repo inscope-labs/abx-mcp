@@ -53,11 +53,18 @@ import java.security.KeyFactory
 import java.security.KeyPair
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.BorderStroke
+import com.inscopelabs.abxmcp.core.mcp.McpExecutor
+import com.inscopelabs.abxmcp.core.mcp.FileSystemReaderImpl
+import com.inscopelabs.abxmcp.core.policy.PolicyEngineImpl
+import com.inscopelabs.abxmcp.core.policy.Capability
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EnrollmentScreen(
     keyStoreManager: KeyStoreManager,
+    sharedText: String? = null,
+    onClearSharedText: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -68,6 +75,21 @@ fun EnrollmentScreen(
     // Core Services
     val sessionManager = remember { SessionManagerProvider.get(context) }
     val sessionState by sessionManager.stateFlow.collectAsState()
+
+    val policyEngine = remember { PolicyEngineImpl() }
+    val fileSystemReader = remember { FileSystemReaderImpl(context) }
+    val mcpExecutor = remember { McpExecutor(policyEngine, fileSystemReader) }
+
+    var showLocalBridgeDialog by remember { mutableStateOf(false) }
+    var bridgeInputText by remember { mutableStateOf("") }
+
+    LaunchedEffect(sharedText) {
+        if (!sharedText.isNullOrBlank()) {
+            bridgeInputText = sharedText
+            showLocalBridgeDialog = true
+            onClearSharedText()
+        }
+    }
 
     // Navigation and UX State
     var selectedTab by remember { mutableStateOf(0) } // 0: Connect, 1: Access, 2: Activity, 3: Remove
@@ -372,7 +394,8 @@ fun EnrollmentScreen(
                             },
                             advancedToggle = advancedToggleAccess,
                             onToggleAdvanced = { advancedToggleAccess = !advancedToggleAccess },
-                            fingerprint = fingerprint
+                            fingerprint = fingerprint,
+                            onOpenLocalBridge = { showLocalBridgeDialog = true }
                         )
                         2 -> ActivityScreenContent(
                             advancedToggle = advancedToggleActivity,
@@ -390,6 +413,19 @@ fun EnrollmentScreen(
                 }
             }
         }
+    }
+
+    if (showLocalBridgeDialog) {
+        LocalBridgeDialog(
+            onDismiss = { showLocalBridgeDialog = false },
+            sessionState = sessionState,
+            sessionManager = sessionManager,
+            mcpExecutor = mcpExecutor,
+            initialInput = bridgeInputText,
+            onRecordActivityEvent = {
+                auditRefreshTrigger++
+            }
+        )
     }
 
     // About / Help Dialog as custom overlay modal to ensure 100% platform-agnostic rendering and testability
@@ -1071,7 +1107,8 @@ fun AccessScreenContent(
     onStopSession: () -> Unit,
     advancedToggle: Boolean,
     onToggleAdvanced: () -> Unit,
-    fingerprint: String
+    fingerprint: String,
+    onOpenLocalBridge: () -> Unit
 ) {
     val isActive = sessionState is SessionState.ACTIVE
 
@@ -1159,6 +1196,27 @@ fun AccessScreenContent(
                     )
                     Text(
                         text = if (isActive) stringResource(R.string.btn_stop_session) else stringResource(R.string.btn_start_session),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                // LOCAL BRIDGE BUTTON
+                OutlinedButton(
+                    onClick = onOpenLocalBridge,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .testTag("open_bridge_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp).padding(end = 8.dp)
+                    )
+                    Text(
+                        text = "Open Local Share/Paste Bridge",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -1821,4 +1879,470 @@ fun CustomModalDialog(
             }
         }
     }
+}
+
+data class ParsedMcpRequest(
+    val operation: String,
+    val path: String,
+    val content: String = "",
+    val encoding: String = "text"
+)
+
+fun parseSharedRequest(input: String): ParsedMcpRequest? {
+    val trimmed = input.trim()
+    if (trimmed.isEmpty()) return null
+    
+    // Try parsing as JSON first
+    try {
+        val json = JSONObject(trimmed)
+        var method = json.optString("method", json.optString("operation", json.optString("name", "")))
+        var params = json.optJSONObject("params") ?: json.optJSONObject("arguments") ?: json
+        
+        if (method == "tools/call" || method == "call_tool") {
+            method = params.optString("name", "")
+            params = params.optJSONObject("arguments") ?: params
+        }
+        
+        val path = params.optString("path", "")
+        val content = params.optString("content", "")
+        val encoding = params.optString("encoding", "text")
+        
+        if (method.isNotEmpty() && path.isNotEmpty()) {
+            return ParsedMcpRequest(method, path, content, encoding)
+        }
+    } catch (e: Exception) {
+        // Ignore JSON parse failure and fall back to plain-text parsing
+    }
+    
+    // Plain-text parsing
+    // Case A: line-by-line key-value
+    var operation = ""
+    var path = ""
+    var content = ""
+    var encoding = "text"
+    
+    val lines = trimmed.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+    
+    for (line in lines) {
+        if (line.startsWith("operation:", ignoreCase = true)) {
+            operation = line.substring("operation:".length).trim()
+        } else if (line.startsWith("method:", ignoreCase = true)) {
+            operation = line.substring("method:".length).trim()
+        } else if (line.startsWith("path:", ignoreCase = true)) {
+            path = line.substring("path:".length).trim()
+        } else if (line.startsWith("content:", ignoreCase = true)) {
+            content = line.substring("content:".length).trim()
+        } else if (line.startsWith("encoding:", ignoreCase = true)) {
+            encoding = line.substring("encoding:".length).trim()
+        }
+    }
+    
+    if (operation.isNotEmpty() && path.isNotEmpty()) {
+        return ParsedMcpRequest(operation, path, content, encoding)
+    }
+    
+    // Case B: single-line `<operation>: <path>`
+    // e.g. "read_file: /Documents/notes.txt"
+    val firstLine = lines.firstOrNull() ?: ""
+    val colonIndex = firstLine.indexOf(':')
+    if (colonIndex > 0) {
+        val potentialOp = firstLine.substring(0, colonIndex).trim().lowercase()
+        val validOps = listOf(
+            "read_file", "read", "write_file", "write", "list_directory", "list",
+            "file_exists", "exists", "get_file_metadata", "metadata",
+            "get_file_version", "version", "append_file", "append", "delete_file", "delete"
+        )
+        if (validOps.contains(potentialOp)) {
+            var remaining = firstLine.substring(colonIndex + 1).trim()
+            var parsedContent = ""
+            val contentTag = "content:"
+            val contentIndex = remaining.indexOf(contentTag, ignoreCase = true)
+            if (contentIndex > 0) {
+                parsedContent = remaining.substring(contentIndex + contentTag.length).trim()
+                remaining = remaining.substring(0, contentIndex).trim()
+            }
+            
+            if (remaining.isNotEmpty()) {
+                val resolvedOp = when (potentialOp) {
+                    "read" -> "read_file"
+                    "write" -> "write_file"
+                    "list" -> "list_directory"
+                    "exists" -> "file_exists"
+                    "metadata" -> "get_file_metadata"
+                    "version" -> "get_file_version"
+                    "append" -> "append_file"
+                    "delete" -> "delete_file"
+                    else -> potentialOp
+                }
+                return ParsedMcpRequest(resolvedOp, remaining, parsedContent, "text")
+            }
+        }
+    }
+    
+    return null
+}
+
+fun executeLocalBridgeRequest(
+    inputText: String,
+    sessionState: SessionState,
+    sessionManager: com.inscopelabs.abxmcp.core.session.SessionManager,
+    mcpExecutor: McpExecutor,
+    allowedRootsStr: String,
+    allowedOpsStr: String,
+    maxReqStr: String,
+    onSuccess: (String) -> Unit,
+    onFailure: (String) -> Unit
+) {
+    // 1. Session State Check (no implicit start, must be ACTIVE)
+    if (sessionState !is SessionState.ACTIVE) {
+        AuditLog.recordRejection(ReasonCode.SESSION_EXPIRED, "unknown", "Local bridge request rejected: session is inactive")
+        onFailure("Blocked: session had ended")
+        return
+    }
+    
+    val sessionId = sessionManager.sessionId ?: "unknown"
+
+    // 2. Parse input text
+    val parsed = parseSharedRequest(inputText)
+    if (parsed == null) {
+        onFailure("couldn't understand this request")
+        return
+    }
+
+    // 3. Build Capability token
+    val parsedRoots = allowedRootsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    val parsedOps = allowedOpsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    val parsedMaxReq = maxReqStr.toIntOrNull() ?: 0
+
+    val capability = Capability(
+        sessionId = sessionId,
+        expiry = System.currentTimeMillis() + sessionManager.getSessionTtl() * 1000L,
+        allowedOperations = parsedOps,
+        allowedRoots = parsedRoots,
+        nonceSeed = "local_bridge_seed",
+        maxRequestCount = parsedMaxReq
+    )
+
+    // 4. Build JSON Request
+    val reqObj = JSONObject()
+    try {
+        reqObj.put("id", 1)
+        reqObj.put("jsonrpc", "2.0")
+        reqObj.put("method", parsed.operation)
+        val paramsObj = JSONObject()
+        paramsObj.put("path", parsed.path)
+        if (parsed.content.isNotEmpty()) {
+            paramsObj.put("content", parsed.content)
+        }
+        paramsObj.put("encoding", parsed.encoding)
+        reqObj.put("params", paramsObj)
+    } catch (e: Exception) {
+        onFailure("couldn't understand this request")
+        return
+    }
+
+    // 5. Execute using McpExecutor
+    try {
+        val resultStr = mcpExecutor.execute(reqObj.toString(), capability, sessionState)
+        val afterEntries = AuditLog.getEntries()
+        
+        val isError = resultStr.contains("\"error\"")
+        if (isError) {
+            val lastEntry = afterEntries.lastOrNull()
+            val reasonCodeStr = lastEntry?.optString("reasonCode", "UNKNOWN") ?: "UNKNOWN"
+            
+            val plainReason = when (reasonCodeStr) {
+                "SESSION_EXPIRED" -> "Blocked: session had ended"
+                "REPLAY_DETECTED" -> "Blocked: duplicate request detected"
+                "PATH_OUT_OF_BOUNDS" -> "Blocked: access outside of authorized folders"
+                "OP_NOT_ALLOWED" -> "Blocked: operation not allowed"
+                "SAF_REVOKED" -> "Blocked: system permission revoked"
+                "TIER_VIOLATION" -> "Blocked: restricted operation attempted"
+                "REQUEST_COUNT_EXCEEDED" -> "Blocked: request limit exceeded"
+                else -> "Blocked: security policy violation"
+            }
+            onFailure(plainReason)
+        } else {
+            onSuccess(resultStr)
+        }
+    } catch (e: Exception) {
+        onFailure("Blocked: security policy violation")
+    }
+}
+
+fun extractBridgeDisplayResult(rawResponse: String): String {
+    return try {
+        val obj = JSONObject(rawResponse)
+        val result = obj.optJSONObject("result") ?: return rawResponse
+        if (result.has("content")) {
+            result.optString("content")
+        } else {
+            result.toString(2)
+        }
+    } catch (e: Exception) {
+        rawResponse
+    }
+}
+
+@Composable
+fun LocalBridgeDialog(
+    onDismiss: () -> Unit,
+    sessionState: SessionState,
+    sessionManager: com.inscopelabs.abxmcp.core.session.SessionManager,
+    mcpExecutor: McpExecutor,
+    initialInput: String = "",
+    onRecordActivityEvent: () -> Unit = {}
+) {
+    var inputText by remember { mutableStateOf(initialInput) }
+    var executionResult by remember { mutableStateOf<String?>(null) }
+    var executionError by remember { mutableStateOf<String?>(null) }
+    var showAdvancedSettings by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
+    val tempDir = remember { System.getProperty("java.io.tmpdir") ?: "" }
+    val defaultRoots = remember {
+        val base = "/storage/emulated/0/Download,/storage/emulated/0/Documents"
+        if (tempDir.isNotEmpty()) "$base,$tempDir" else base
+    }
+    
+    var bridgeAllowedRoots by remember { mutableStateOf(defaultRoots) }
+    var bridgeAllowedOperations by remember { mutableStateOf("read_file,write_file,list_directory,delete_file,append_file,file_exists,get_file_metadata,get_file_version") }
+    var bridgeMaxRequestCount by remember { mutableStateOf("0") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Manual Local Bridge",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("bridge_dialog_title")
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Paste or share request descriptions here. The request will run through the secure local authorization engine and return a response to copy back.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Supported Formats:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            text = "• Colon Format:\n  read_file: /Documents/notes.txt\n" +
+                                   "• Key-Value Lines:\n  operation: read_file\n  path: /Documents/notes.txt\n" +
+                                   "• Standard JSON:\n  {\"method\": \"read_file\", \"params\": {\"path\": \"/Documents/notes.txt\"}}",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+                
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    label = { Text("Request (Paste or type)") },
+                    placeholder = { Text("e.g. read_file: /storage/emulated/0/Documents/notes.txt") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("bridge_request_input"),
+                    minLines = 3,
+                    maxLines = 6
+                )
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAdvancedSettings = !showAdvancedSettings }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = if (showAdvancedSettings) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Advanced Capability Settings",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                
+                if (showAdvancedSettings) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    ) {
+                        OutlinedTextField(
+                            value = bridgeAllowedRoots,
+                            onValueChange = { bridgeAllowedRoots = it },
+                            label = { Text("Allowed Roots (comma-separated)") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("bridge_roots_input"),
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        OutlinedTextField(
+                            value = bridgeAllowedOperations,
+                            onValueChange = { bridgeAllowedOperations = it },
+                            label = { Text("Allowed Operations (comma-separated)") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("bridge_ops_input"),
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        OutlinedTextField(
+                            value = bridgeMaxRequestCount,
+                            onValueChange = { bridgeMaxRequestCount = it },
+                            label = { Text("Max Request Count (0 = unlimited)") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("bridge_max_req_input"),
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+                
+                if (executionError != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        modifier = Modifier.fillMaxWidth().testTag("bridge_error_card")
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Rejection Reason",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = executionError ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.testTag("bridge_error_text")
+                            )
+                        }
+                    }
+                }
+                
+                if (executionResult != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth().testTag("bridge_result_card")
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Execution Result",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            val fullResult = executionResult ?: ""
+                            val displayResult = if (fullResult.length > 1000) {
+                                fullResult.take(1000) + "\n\n[Content truncated for display. Click 'Copy Result' to copy the full content.]"
+                            } else {
+                                fullResult
+                            }
+                            
+                            Text(
+                                text = displayResult,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .heightIn(max = 200.dp)
+                                    .testTag("bridge_result_text")
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (executionResult != null || executionError != null) {
+                    Button(
+                        onClick = {
+                            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText(
+                                "ABX MCP Bridge Result",
+                                executionResult ?: executionError ?: ""
+                            )
+                            clipboardManager.setPrimaryClip(clip)
+                        },
+                        modifier = Modifier.testTag("bridge_copy_result_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Text("Copy Result")
+                    }
+                }
+                
+                Button(
+                    onClick = {
+                        executionResult = null
+                        executionError = null
+                        executeLocalBridgeRequest(
+                            inputText = inputText,
+                            sessionState = sessionState,
+                            sessionManager = sessionManager,
+                            mcpExecutor = mcpExecutor,
+                            allowedRootsStr = bridgeAllowedRoots,
+                            allowedOpsStr = bridgeAllowedOperations,
+                            maxReqStr = bridgeMaxRequestCount,
+                            onSuccess = { res ->
+                                executionResult = extractBridgeDisplayResult(res)
+                                onRecordActivityEvent()
+                            },
+                            onFailure = { err ->
+                                executionError = err
+                                onRecordActivityEvent()
+                            }
+                        )
+                    },
+                    modifier = Modifier.testTag("bridge_execute_button")
+                ) {
+                    Text("Execute")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("bridge_close_button")
+            ) {
+                Text("Close")
+            }
+        }
+    )
 }
