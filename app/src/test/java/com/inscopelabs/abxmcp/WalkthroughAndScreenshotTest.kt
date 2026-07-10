@@ -210,6 +210,36 @@ class WalkthroughAndScreenshotTest {
         composeTestRule.onNodeWithTag("start_session_button").assertIsDisplayed()
     }
 
+    @Test
+    fun testStartSessionLaunchesTunnelService() {
+        composeTestRule.setContent {
+            MyApplicationTheme(darkTheme = false, dynamicColor = false) {
+                EnrollmentScreen(keyStoreManager = keyStoreManager)
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        // Go to Access Screen
+        composeTestRule.onNodeWithTag("nav_tab_access").performClick()
+        composeTestRule.waitForIdle()
+
+        // Clear any previously recorded service starts
+        val application = ApplicationProvider.getApplicationContext<android.app.Application>()
+        org.robolectric.Shadows.shadowOf(application).clearStartedServices()
+
+        // Start session
+        composeTestRule.onNodeWithTag("start_session_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify that starting the session through the UI also launches TunnelService
+        val nextServiceIntent = org.robolectric.Shadows.shadowOf(application).nextStartedService
+        assertNotNull("TunnelService should have been started via Intent", nextServiceIntent)
+        assertEquals(
+            com.inscopelabs.abxmcp.core.tunnel.TunnelService::class.java.name,
+            nextServiceIntent.component?.className
+        )
+    }
+
     // ==========================================
     // ACCESSIBILITY & CONTRAST LEVEL CHECKS
     // ==========================================

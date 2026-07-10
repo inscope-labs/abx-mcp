@@ -377,6 +377,7 @@ fun EnrollmentScreen(
                             onStartSession = {
                                 try {
                                     sessionManager.startSession(UserGesture.LocalButtonPress)
+                                    com.inscopelabs.abxmcp.core.tunnel.TunnelService.start(context)
                                 } catch (e: Exception) {
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar("Cannot start session: ${e.message}")
