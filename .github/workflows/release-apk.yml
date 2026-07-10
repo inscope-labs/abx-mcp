@@ -52,25 +52,29 @@ jobs:
             exit 1
           }
 
-      - name: Build signed release APK
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/upload-key.jks
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle --no-daemon --stacktrace :app:assembleRelease
-
       - name: Verify output APK is actually signed
-        run: |
-          APK=app/build/outputs/apk/release/app-release.apk
-          if [ ! -f "$APK" ]; then
-            echo "::error::Expected APK not found at $APK — build did not produce a release artifact."
-            exit 1
-          fi
-          apksigner verify "$APK" || {
-            echo "::error::Output APK is not properly signed. Do not upload this artifact."
-            exit 1
-          }
-          echo "APK built and signature verified: $APK"
+  shell: bash
+  run: |
+    APK="app/build/outputs/apk/release/app-release.apk"
+
+    if [[ ! -f "$APK" ]]; then
+      echo "::error::Expected APK not found at $APK"
+      exit 1
+    fi
+
+    APKSIGNER=$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools" \
+      -type f -name apksigner | sort -V | tail -n1)
+
+    if [[ -z "$APKSIGNER" ]]; then
+      echo "::error::Unable to locate apksigner in the Android SDK."
+      exit 1
+    fi
+
+    echo "Using: $APKSIGNER"
+
+    "$APKSIGNER" verify --verbose "$APK"
+
+    echo "APK built and signature verified."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
