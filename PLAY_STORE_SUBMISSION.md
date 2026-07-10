@@ -19,7 +19,7 @@ This declaration lists all data types collected or processed by ABC Server, thei
 ### Data Types Collected & Processed
 1.  **Files and Documents (Read-Only Access):**
     *   **Description:** The app accesses local files and directory trees as authorized by the user's cryptographic Capability Token.
-    *   **Purpose:** App functionality. Transmitted securely through the local loopback or local Cloudflare tunnel to the user-authorized Model Context Protocol (MCP) host.
+    *   **Purpose:** App functionality. Transmitted securely through the local loopback or secure WebSocket relay transport to the user-authorized Model Context Protocol (MCP) host.
     *   **Sharing:** **Never shared with third parties.**
 2.  **Device and Security Identifiers (Hardware Public Key):**
     *   **Description:** Generates unique, non-exportable cryptographic key pairs inside the device's hardware-backed KeyStore (TEE/StrongBox) for hardware attestation and session-gate signatures.
@@ -31,7 +31,7 @@ This declaration lists all data types collected or processed by ABC Server, thei
     *   **Sharing:** **Never shared with third parties. Stored strictly on-device.**
 
 ### Encryption and Security
-*   **In Transit:** All external traffic is routed through an end-to-end encrypted `cloudflared` tunnel, secured using Transport Layer Security (TLS 1.3). No plain-text data leaves the device.
+*   **In Transit:** All external traffic is routed over secure WebSocket connections (WSS/TLS 1.3) through a WebSocket relay server. Note on Privacy Posture: Unlike direct peer-to-peer or zero-trust tunnels, a WebSocket relay serves as an intermediate forwarder. While connection legs from the app to the relay, and from the relay to the MCP client, are encrypted using TLS, the relay operator has potential visibility into the unencrypted JSON-RPC payload contents passing through the relay server, unless separate end-to-end application-layer encryption is established.
 *   **At Rest:** All audit trails are stored strictly inside a sandboxed JSON Lines (`.jsonl`) file, and active session states are maintained in-memory, all protected inside the application's private files directory by Android's File-Based Encryption (FBE). Keys are protected inside the secure enclave (TEE/StrongBox) and are non-exportable.
 
 ### Data Deletion
@@ -56,7 +56,7 @@ ABC Server ("we", "us", or "our") is a developer security tool designed to act a
 3.  **Local Audit Trail:** A signed, append-only ledger of security policy rejections and unauthorized access attempts is stored strictly in a local file inside the app's secure sandbox directory.
 
 #### Data Transit
-ABC Server does not run a central cloud service, nor does it collect, harvest, or aggregate your files or keys. Any data transmitted to an external MCP client is routed through a secure, end-to-end encrypted tunnel (`cloudflared`) managed directly under your account credentials. We have no visibility into the payload, metadata, or contents of these tunnels.
+ABC Server does not run a central cloud service, nor does it collect, harvest, or aggregate your files or keys. Any data transmitted to an external MCP client is routed through a WebSocket relay transport. Note on Privacy Posture: Because the WebSocket relay acts as an intermediate message forwarder, the operator of the relay server has potential visibility into the metadata and the JSON-RPC request/response payloads in transit (as they are decrypted at the relay termination point unless end-to-end application-layer encryption is separately applied). If using a public or third-party relay, your data payloads could be visible to that operator. For absolute zero-knowledge privacy, users are advised to run and self-host their own private WebSocket relay server.
 
 #### User Consent and Security Controls
 *   **Explicit Session Gating:** ABC Server cannot process any request unless a physical user-gesture (e.g., button press) explicitly starts or extends the active session.
@@ -74,11 +74,11 @@ These arguments are prepared for the Google Play Console's declaration forms.
 ### Permission: `FOREGROUND_SERVICE_SPECIAL_USE`
 
 *   **Detailed Description of Core Feature:**
-    ABC Server acts as a persistent local Model Context Protocol (MCP) bridge. It manages a secure background socket connection (`cloudflared` tunnel) that pipes verified JSON-RPC queries from developer tools directly to the on-device Policy Engine and FileSystem executor. This bridge must remain active and maintain a stable, non-interrupted network connection during active development sessions.
+    ABC Server acts as a persistent local Model Context Protocol (MCP) bridge. It manages a secure background socket connection (WebSocket relay transport) that pipes verified JSON-RPC queries from developer tools directly to the on-device Policy Engine and FileSystem executor. This bridge must remain active and maintain a stable, non-interrupted network connection during active development sessions.
 *   **Why a Foreground Service is Mandatory:**
-    If the connection is interrupted or killed by the Android OS's aggressive background battery saver, active AI agent tasks will fail, and session state will get corrupted. A foreground service displaying a persistent, non-dismissible notification is strictly required to inform the user that their secure hardware-backed bridge is actively running, and to prevent the OS from killing the tunnel binary.
+    If the connection is interrupted or killed by the Android OS's aggressive background battery saver, active AI agent tasks will fail, and session state will get corrupted. A foreground service displaying a persistent, non-dismissible notification is strictly required to inform the user that their secure hardware-backed bridge is actively running, and to prevent the OS from terminating the application's native WebSocket transport service.
 *   **User-Gated Safety Architecture (The Core Argument):**
-    To ensure complete user safety, this background tunnel is strictly bound to a highly secure, gesture-gated session lifecycle:
+    To ensure complete user safety, this background connection is strictly bound to a highly secure, gesture-gated session lifecycle:
     1.  The foreground service *cannot* start unless the user performs a physical button press on the screen.
     2.  The active session is protected by a strict Time-To-Live (TTL) timer (default: 15 minutes).
     3.  Users can manually extend the session via a high-priority Notification Action or immediately kill the entire service and revoke all file access with one tap.
@@ -128,6 +128,8 @@ These arguments are prepared for the Google Play Console's declaration forms.
 
 ## 6. Pre-Launch Verification Status
 
-All regression tests and release-specific sanitization checks are passing successfully.
-*   **Shrinking/Obfuscation Verification:** Passing. Core model deserialization, SQLite storage, and cryptography remain functional under full Proguard minification.
-*   **Release-Only Redaction:** Verified. Path names, PolicyEngine exceptions, and authorization rejections are genericized into non-leaking "Access denied" errors under release builds, with full debug output strictly restricted to local tests.
+The current testing, layout, and visual behavior have been systematically verified and are fully passing in the local test environment.
+*   **Unit & Integration Tests:** **Passed**. A comprehensive suite of 10 automated JVM and Robolectric tests (covering `AuditLogPersistenceTest`, `KeyStoreAndFingerprintTest`, `SessionManagerTest`, `TunnelLifecycleManagerTest`, and more) executes and passes successfully.
+*   **Critical User Journey (Walkthrough) Verification:** **Passed**. The full simulated lifecycle walkthrough (`testNonTechnicalWalkthrough_SimulatesCompleteLifecycle` in `WalkthroughAndScreenshotTest.kt`) has been successfully verified, confirming that connection, access session activation, violation audit logging, data compliance wipe, and state reset operate flawlessly in sequence.
+*   **Visual Layout & UI Regression Verification:** **Passed**. Roborazzi screenshot verification tests are passing successfully, capturing pixel-perfect layouts for all primary application screens (Connect, Access, Activity, Remove) under both light and dark themes.
+*   **Release Shrinking/Obfuscation Verification:** **Structural Rules Configured**. Proguard rules have been thoroughly verified to prevent shrinking or optimization regressions on Core model serialization, Room database queries, and cryptographic APIs. While structural rules are in place, full dynamic runtime verification of a fully minified release binary has not yet been executed on physical Android hardware.
