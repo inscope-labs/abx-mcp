@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Deletion Instructions - ABC Server (ABX-MCP)</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --primary-color: #dc2626; /* Warning/Deletion red-theme prefix */
+            --primary-hover: #b91c1c;
+            --border-color: #e2e8f0;
+            --accent-bg: #fef2f2;
+            --accent-text: #991b1b;
+            --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --card-bg: #1e293b;
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+                --primary-color: #ef4444;
+                --primary-hover: #f87171;
+                --border-color: #334155;
+                --accent-bg: #451a1a;
+                --accent-text: #fecaca;
+            }
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .brand-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin: 0 0 10px 0;
+            letter-spacing: -0.025em;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .last-updated {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        h2:first-of-type {
+            margin-top: 0;
+        }
+
+        p, li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        ul, ol {
+            padding-left: 24px;
+            margin-bottom: 24px;
+        }
+
+        li {
+            margin-bottom: 12px;
+        }
+
+        .step-title {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .highlight-box {
+            background-color: var(--accent-bg);
+            border-left: 4px solid var(--primary-color);
+            color: var(--accent-text);
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 24px 0;
+        }
+
+        .highlight-box p {
+            color: inherit;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+
+        .data-table th, .data-table td {
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            text-align: left;
+        }
+
+        .data-table th {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        .data-table td {
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="brand-title">Data Deletion</h1>
+            <p class="subtitle">Instructions for ABC Server (ABX-MCP)</p>
+            <div class="last-updated">Last Updated: July 10, 2026</div>
+        </div>
+
+        <div class="card">
+            <h2>1. Our Data Philosophy</h2>
+            <p>
+                **ABC Server** (ABX-MCP) is designed from the ground up as a fully local, on-device application. 
+            </p>
+            <p>
+                <strong>We do not collect, store, or transmit any user data to external servers or cloud environments.</strong> 
+                There is no account system, no cloud backend, and no remote database holding your personal information. Consequently, you are in full and exclusive control of your data at all times.
+            </p>
+
+            <div class="highlight-box">
+                <p>
+                    Because no data ever leaves your device, there is no separate deletion request process, waiting period, or backend to contact. Deleting your local data removes it immediately and permanently.
+                </p>
+            </div>
+
+            <h2>2. Steps to Delete Your Local Data</h2>
+            <p>
+                You have direct control over all state and configuration files generated by the application. You can completely wipe all local data using either of the following standard Android methods:
+            </p>
+            
+            <ol>
+                <li>
+                    <span class="step-title">Option 1: Clear Application Storage</span>
+                    <p>Wipe all active configurations, logs, and cryptographic parameters without uninstalling the application:</p>
+                    <ul>
+                        <li>Open your Android device's <strong>Settings</strong> app.</li>
+                        <li>Navigate to <strong>Apps</strong> (or <strong>Apps & Notifications</strong>) &rarr; <strong>ABC Server</strong>.</li>
+                        <li>Tap <strong>Storage</strong> (or <strong>Storage & Cache</strong>).</li>
+                        <li>Tap <strong>Clear Data</strong> (or <strong>Clear Storage</strong>). This immediately and irreversibly wipes all locally stored session state, audit logs, and cryptographic keys generated by the application.</li>
+                    </ul>
+                </li>
+                <li>
+                    <span class="step-title">Option 2: Uninstall the Application</span>
+                    <p>Permanently remove the application and all of its associated sandboxed files:</p>
+                    <ul>
+                        <li>Press and hold the <strong>ABC Server</strong> app icon on your home screen or app drawer.</li>
+                        <li>Drag it to the <strong>Uninstall</strong> region or tap <strong>Uninstall</strong>.</li>
+                        <li>Confirm the uninstallation. This immediately and permanently deletes all associated local data, including the Android Keystore-backed cryptographic keys tied to the application.</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h2>3. Local Data Types and Retention</h2>
+            <p>
+                For complete technical transparency, here is a detailed breakdown of the data types processed locally and how they are retained:
+            </p>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Data Type</th>
+                        <th>Where Stored</th>
+                        <th>Retention Period & Deletion Behavior</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Session Tokens</strong></td>
+                        <td>Device Volatile Memory (RAM)</td>
+                        <td>Held transiently during active communication sessions. Automatically cleared and forgotten on session termination.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Audit Logs</strong></td>
+                        <td>On-device Protected Storage</td>
+                        <td>Stored locally for security transparency. Deleted instantly upon clearing app data or uninstalling the app. No remote backups or copies are kept.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cryptographic Keys</strong></td>
+                        <td>Android Keystore System (TEE/StrongBox)</td>
+                        <td>Non-exportable cryptographic hardware entries. Instantly and permanently deleted upon app uninstallation or clearing storage.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>
+                Once deleted via the local settings or uninstallation, **no data is retained anywhere**—there is no recovery grace period, off-site backup, or server copy.
+            </p>
+
+            <h2>4. Questions or Support</h2>
+            <p>
+                If you have any questions about these data deletion instructions or your privacy when using ABC Server, please contact us at:
+            </p>
+            <p>
+                <strong>Email:</strong> <a href="mailto:afterdawn.service@gmail.com">afterdawn.service@gmail.com</a>
+            </p>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 ABC Server. All rights reserved.
+        </div>
+    </div>
+</body>
+</html>
