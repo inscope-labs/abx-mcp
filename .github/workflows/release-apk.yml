@@ -1,0 +1,95 @@
+name: Build Signed Release APK
+
+on:
+  workflow_dispatch:   # manual trigger only — never runs automatically
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build & Sign APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ENV_ABX_MCP
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Verify signing secrets are present
+        run: |
+          missing=0
+          [ -z "${{ secrets.KEYSTORE_BASE64 }}" ] && echo "::error::KEYSTORE_BASE64 secret is not set" && missing=1
+          [ -z "${{ secrets.STORE_PASSWORD }}" ] && echo "::error::STORE_PASSWORD secret is not set" && missing=1
+          [ -z "${{ secrets.KEY_PASSWORD }}" ] && echo "::error::KEY_PASSWORD secret is not set" && missing=1
+          if [ "$missing" = "1" ]; then
+            echo "::error::One or more release signing secrets are missing. Refusing to build an unsigned or wrongly-signed release artifact. Add the missing secret(s) under Settings > Secrets and variables > Actions, then re-run."
+            exit 1
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.1"
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > upload-key.jks
+
+      - name: Verify decoded keystore is valid
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          keytool -list -keystore upload-key.jks -storepass "$STORE_PASSWORD" -alias upload || {
+            echo "::error::Decoded keystore failed to open with the provided STORE_PASSWORD/alias 'upload'. Check that KEYSTORE_BASE64 was encoded correctly (base64 -w0) and that the alias matches."
+            rm -f upload-key.jks
+            exit 1
+          }
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/upload-key.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+
+      - name: Verify output APK is actually signed
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$APK" ]; then
+            echo "::error::Expected APK not found at $APK — build did not produce a release artifact."
+            exit 1
+          fi
+          apksigner verify "$APK" || {
+            echo "::error::Output APK is not properly signed. Do not upload this artifact."
+            exit 1
+          }
+          echo "APK built and signature verified: $APK"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload build reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-reports
+          path: |
+            **/build/reports/**
+            **/build/test-results/**
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f upload-key.jks

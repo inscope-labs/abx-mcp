@@ -27,6 +27,7 @@ interface FileSystemReader {
     fun deleteFile(path: String): Boolean
 }
 
+@android.annotation.SuppressLint("NewApi")
 class FileSystemReaderImpl(private val context: Context) : FileSystemReader {
 
     var writeInterceptor: ((File) -> Unit)? = null
