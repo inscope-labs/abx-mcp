@@ -25,6 +25,8 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
         androidx.documentfile.provider.DocumentFile.fromTreeUri(ctx, uri)
     }
 
+    private val requestCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
     companion object {
         fun getRootPathFromTreeUri(context: android.content.Context, uri: android.net.Uri): String? {
             try {
@@ -74,11 +76,24 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
     ): AuthorizationResult {
         // 1. Check if the session is ACTIVE
         if (currentState !is SessionState.ACTIVE) {
+            requestCounts.remove(token.sessionId)
             AuditLog.recordRejection(ReasonCode.SESSION_EXPIRED, token.sessionId, "Session is not active (state: $currentState)")
             return AuthorizationResult.Rejected(
                 if (isDebug) "Session is not active (current state: $currentState)"
                 else "Authorization rejected: Access denied"
             )
+        }
+
+        // 1b. Enforce maxRequestCount
+        if (token.maxRequestCount > 0) {
+            val currentCount = requestCounts.getOrDefault(token.sessionId, 0)
+            if (currentCount >= token.maxRequestCount) {
+                AuditLog.recordRejection(ReasonCode.REQUEST_COUNT_EXCEEDED, token.sessionId, "Request count limit of ${token.maxRequestCount} exceeded")
+                return AuthorizationResult.Rejected(
+                    if (isDebug) "Request count limit of ${token.maxRequestCount} exceeded"
+                    else "Authorization rejected: Access denied"
+                )
+            }
         }
 
         // 2. Reject any non-file schemes (e.g. content://)
@@ -249,6 +264,9 @@ class PolicyEngineImpl(private val isDebug: Boolean = isRunningInTest()) : Polic
             }
         }
 
+        if (token.maxRequestCount > 0) {
+            requestCounts.merge(token.sessionId, 1) { old, one -> old + one }
+        }
         return AuthorizationResult.Allowed(cleanReq)
     }
 }

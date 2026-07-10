@@ -10,6 +10,10 @@ class SessionManagerImpl : SessionManager {
     private val _state = MutableStateFlow<SessionState>(SessionState.INACTIVE)
     override val stateFlow: StateFlow<SessionState> = _state.asStateFlow()
 
+    private var _sessionId: String? = null
+    override val sessionId: String?
+        get() = _sessionId
+
     private var defaultTtlSeconds: Int = 300
     private var ttlSeconds: Int = 300
 
@@ -53,8 +57,10 @@ class SessionManagerImpl : SessionManager {
 
         // Legal transitions: INACTIVE -> ACTIVE, EXPIRED -> ACTIVE
         if (currentState is SessionState.INACTIVE || currentState is SessionState.EXPIRED) {
+            _sessionId = "sess_" + java.util.UUID.randomUUID().toString().take(12)
             ttlSeconds = defaultTtlSeconds // Reset TTL to the configured default or explicitly supplied value
             _state.value = SessionState.ACTIVE
+            AuditLog.recordSessionApproval(_sessionId!!, "default_enrolled_agent")
             return true
         }
 

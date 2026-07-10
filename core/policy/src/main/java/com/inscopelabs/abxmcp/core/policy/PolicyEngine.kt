@@ -12,7 +12,9 @@ data class Capability(
     val expiry: Long,
     val allowedOperations: List<String>,
     val allowedRoots: List<String>,
-    val nonceSeed: String
+    val nonceSeed: String,
+    val issuedTime: Long = System.currentTimeMillis(),
+    val maxRequestCount: Int = 0
 )
 
 sealed class AuthorizationResult {

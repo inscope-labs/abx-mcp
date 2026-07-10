@@ -1279,6 +1279,8 @@ fun AccessScreenContent(
                             put("allowedOperations", listOf("read_file", "write_file", "list_directory"))
                             put("allowedRoots", listOf("/storage/emulated/0/Download", "/storage/emulated/0/Documents"))
                             put("nonceSeed", "seed_abc_123_xyz")
+                            put("issuedTime", System.currentTimeMillis())
+                            put("maxRequestCount", 0)
                             put("fingerprint", fingerprint)
                         }
 
@@ -1469,6 +1471,11 @@ fun ActivityScreenContent(
                         "OP_NOT_ALLOWED" -> "Blocked: operation not allowed"
                         "SAF_REVOKED" -> "Blocked: system permission revoked"
                         "TIER_VIOLATION" -> "Blocked: restricted operation attempted"
+                        "REQUEST_COUNT_EXCEEDED" -> "Blocked: request limit exceeded"
+                        "SUCCESS" -> "Success: authorized operation completed"
+                        "TUNNEL_START" -> "Info: tunnel connection established"
+                        "TUNNEL_STOP" -> "Info: tunnel connection closed"
+                        "SESSION_APPROVAL" -> "Info: session approved"
                         else -> "Blocked: security policy violation"
                     }
 

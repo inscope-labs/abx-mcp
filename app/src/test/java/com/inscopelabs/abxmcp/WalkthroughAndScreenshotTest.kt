@@ -270,8 +270,8 @@ class WalkthroughAndScreenshotTest {
             composeTestRule.onNodeWithTag("nav_tab_activity").performClick()
             composeTestRule.waitForIdle()
 
-            // Check clean log state initially
-            composeTestRule.onNodeWithText("No security block events or rejections recorded yet.").assertIsDisplayed()
+            // Check session approval log is visible
+            composeTestRule.onNodeWithText("Info: session approved").assertIsDisplayed()
 
             // Trigger two simulated block events
             composeTestRule.onNodeWithTag("sim_btn_expired").performScrollTo().performClick()

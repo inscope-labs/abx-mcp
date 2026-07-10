@@ -174,6 +174,14 @@ class McpExecutor(
                 }
             }
 
+            AuditLog.recordSuccess(
+                operation = operation,
+                sessionId = token.sessionId,
+                agentIdentity = "default_enrolled_agent",
+                path = authorizedPath,
+                details = "Executed operation: $operation successfully"
+            )
+
             // Build standard MCP structured ToolResponse:
             // { "content": [ { "type": "text", "text": "<json-result>" } ], "isError": false }
             val mcpContentArr = JSONArray()

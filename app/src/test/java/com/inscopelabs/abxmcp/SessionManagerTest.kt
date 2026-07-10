@@ -200,4 +200,15 @@ class SessionManagerTest {
             assertEquals("State must remain INACTIVE when trigger is Unsafe-allocated", SessionState.INACTIVE, sessionManager.getState())
         }
     }
+
+    @Test
+    fun testSessionIdGeneration() {
+        assertNull("Session ID should be null initially", sessionManager.sessionId)
+
+        val started = sessionManager.startSession(UserGesture.LocalButtonPress)
+        assertTrue(started)
+        val sId = sessionManager.sessionId
+        assertNotNull("Session ID should not be null when session is active", sId)
+        assertTrue("Session ID should start with sess_", sId!!.startsWith("sess_"))
+    }
 }

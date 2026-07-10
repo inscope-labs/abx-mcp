@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
     implementation(project(":core:session"))
+    implementation(project(":core:audit"))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
 }

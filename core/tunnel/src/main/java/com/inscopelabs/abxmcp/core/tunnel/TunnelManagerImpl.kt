@@ -1,6 +1,8 @@
 package com.inscopelabs.abxmcp.core.tunnel
 
 import android.content.Context
+import com.inscopelabs.abxmcp.core.audit.AuditLog
+import com.inscopelabs.abxmcp.core.audit.TunnelAuditEvent
 import com.inscopelabs.abxmcp.core.session.SessionManager
 import com.inscopelabs.abxmcp.core.session.SessionState
 import kotlinx.coroutines.CoroutineScope
@@ -112,6 +114,8 @@ class TunnelManagerImpl(
             _isRunningFlow.value = true
             _stateFlow.value = TunnelState.RUNNING
 
+            AuditLog.recordTunnelEvent(TunnelAuditEvent.START, sessionManager.sessionId ?: "unknown")
+
             // Start connection monitoring
             startConnectionMonitoring()
 
@@ -139,6 +143,7 @@ class TunnelManagerImpl(
 
     @Synchronized
     override fun stopTunnel() {
+        val wasRunning = _isRunningFlow.value
         monitoringJob?.cancel()
         monitoringJob = null
         reconnectJob?.cancel()
@@ -151,6 +156,10 @@ class TunnelManagerImpl(
             TunnelState.UNAVAILABLE
         } else {
             TunnelState.STOPPED
+        }
+
+        if (wasRunning) {
+            AuditLog.recordTunnelEvent(TunnelAuditEvent.STOP, sessionManager.sessionId ?: "unknown")
         }
     }
 
@@ -181,6 +190,7 @@ class TunnelManagerImpl(
                 } else {
                     TunnelState.STOPPED
                 }
+                AuditLog.recordTunnelEvent(TunnelAuditEvent.STOP, sessionManager.sessionId ?: "unknown")
             }
         }
     }

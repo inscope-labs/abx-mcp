@@ -218,4 +218,55 @@ class AuditLogTest {
         assertEquals(firstHashBeforeRestart, AuditLog.getLastHash())
         assertTrue(AuditLog.verifyIntegrity())
     }
+
+    @Test
+    fun testNewAuditLogMethodsParticipationInHashChain() {
+        // Confirm initially empty
+        assertTrue(AuditLog.getEntries().isEmpty())
+        assertEquals("0000000000000000000000000000000000000000000000000000000000000000", AuditLog.getLastHash())
+
+        // 1. Record session approval
+        AuditLog.recordSessionApproval("session-456", "test_agent_alpha")
+        val entries1 = AuditLog.getEntries()
+        assertEquals(1, entries1.size)
+        assertEquals("SESSION_APPROVAL", entries1[0].getString("reasonCode"))
+        assertEquals("test_agent_alpha", entries1[0].getString("agentIdentity"))
+        assertEquals("0000000000000000000000000000000000000000000000000000000000000000", entries1[0].getString("prevHash"))
+
+        val approvalHash = AuditLog.getLastHash()
+        assertNotEquals("0000000000000000000000000000000000000000000000000000000000000000", approvalHash)
+
+        // 2. Record tunnel event (START)
+        AuditLog.recordTunnelEvent(TunnelAuditEvent.START, "session-456")
+        val entries2 = AuditLog.getEntries()
+        assertEquals(2, entries2.size)
+        assertEquals("TUNNEL_START", entries2[1].getString("reasonCode"))
+        assertEquals("START", entries2[1].getString("event"))
+        assertEquals(approvalHash, entries2[1].getString("prevHash"))
+
+        val tunnelStartHash = AuditLog.getLastHash()
+
+        // 3. Record operation success
+        AuditLog.recordSuccess("read_file", "session-456", "test_agent_alpha", "/path/to/file", "Read 100 bytes")
+        val entries3 = AuditLog.getEntries()
+        assertEquals(3, entries3.size)
+        assertEquals("SUCCESS", entries3[2].getString("reasonCode"))
+        assertEquals("read_file", entries3[2].getString("operation"))
+        assertEquals("/path/to/file", entries3[2].getString("path"))
+        assertEquals("test_agent_alpha", entries3[2].getString("agentIdentity"))
+        assertEquals(tunnelStartHash, entries3[2].getString("prevHash"))
+
+        val successHash = AuditLog.getLastHash()
+
+        // 4. Record tunnel event (STOP)
+        AuditLog.recordTunnelEvent(TunnelAuditEvent.STOP, "session-456")
+        val entries4 = AuditLog.getEntries()
+        assertEquals(4, entries4.size)
+        assertEquals("TUNNEL_STOP", entries4[3].getString("reasonCode"))
+        assertEquals("STOP", entries4[3].getString("event"))
+        assertEquals(successHash, entries4[3].getString("prevHash"))
+
+        // Verify the entire mixed success/approval/tunnel/rejection chain has perfect integrity
+        assertTrue("Audit log integrity must be fully valid across all mixed event types", AuditLog.verifyIntegrity())
+    }
 }

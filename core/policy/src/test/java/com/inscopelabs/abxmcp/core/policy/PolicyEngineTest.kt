@@ -185,4 +185,97 @@ class PolicyEngineTest {
         val inactiveResult = policyEngine.authorize(request, capability, SessionState.INACTIVE)
         assertTrue("Must be rejected when session is inactive", inactiveResult is AuthorizationResult.Rejected)
     }
+
+    @Test
+    fun testMaxRequestCountEnforcement() {
+        val rootDir = tempDir.resolve("Documents")
+        Files.createDirectories(rootDir)
+
+        val capability = Capability(
+            sessionId = "session_max_req",
+            expiry = System.currentTimeMillis() + 60000,
+            allowedOperations = listOf("read_file"),
+            allowedRoots = listOf(rootDir.toString()),
+            nonceSeed = "seed_1",
+            maxRequestCount = 2
+        )
+
+        val request = Request(
+            path = rootDir.resolve("test.txt").toString(),
+            operation = "read_file"
+        )
+
+        // First request: Allowed
+        val result1 = policyEngine.authorize(request, capability, SessionState.ACTIVE)
+        assertTrue("First request should be allowed", result1 is AuthorizationResult.Allowed)
+
+        // Second request: Allowed
+        val result2 = policyEngine.authorize(request, capability, SessionState.ACTIVE)
+        assertTrue("Second request should be allowed", result2 is AuthorizationResult.Allowed)
+
+        // Third request: Rejected
+        val result3 = policyEngine.authorize(request, capability, SessionState.ACTIVE)
+        assertTrue("Third request should be rejected as limit is 2", result3 is AuthorizationResult.Rejected)
+    }
+
+    @Test
+    fun testMaxRequestCountResetOnNonActiveState() {
+        val rootDir = tempDir.resolve("Documents")
+        Files.createDirectories(rootDir)
+
+        val capability = Capability(
+            sessionId = "session_reset_req",
+            expiry = System.currentTimeMillis() + 60000,
+            allowedOperations = listOf("read_file"),
+            allowedRoots = listOf(rootDir.toString()),
+            nonceSeed = "seed_1",
+            maxRequestCount = 1
+        )
+
+        val request = Request(
+            path = rootDir.resolve("test.txt").toString(),
+            operation = "read_file"
+        )
+
+        // First request: Allowed
+        val result1 = policyEngine.authorize(request, capability, SessionState.ACTIVE)
+        assertTrue(result1 is AuthorizationResult.Allowed)
+
+        // Second request: Rejected
+        val result2 = policyEngine.authorize(request, capability, SessionState.ACTIVE)
+        assertTrue(result2 is AuthorizationResult.Rejected)
+
+        // End session (transition to INACTIVE)
+        val inactiveResult = policyEngine.authorize(request, capability, SessionState.INACTIVE)
+        assertTrue(inactiveResult is AuthorizationResult.Rejected)
+
+        // Try active session again - count should be reset and allowed once more
+        val result3 = policyEngine.authorize(request, capability, SessionState.ACTIVE)
+        assertTrue("Should be allowed again because state transition to INACTIVE reset the count", result3 is AuthorizationResult.Allowed)
+    }
+
+    @Test
+    fun testMaxRequestCountUnboundedWhenZeroOrUnset() {
+        val rootDir = tempDir.resolve("Documents")
+        Files.createDirectories(rootDir)
+
+        val capability = Capability(
+            sessionId = "session_unbounded_req",
+            expiry = System.currentTimeMillis() + 60000,
+            allowedOperations = listOf("read_file"),
+            allowedRoots = listOf(rootDir.toString()),
+            nonceSeed = "seed_1",
+            maxRequestCount = 0 // unbounded
+        )
+
+        val request = Request(
+            path = rootDir.resolve("test.txt").toString(),
+            operation = "read_file"
+        )
+
+        for (i in 1..10) {
+            val result = policyEngine.authorize(request, capability, SessionState.ACTIVE)
+            assertTrue("Request $i should be allowed since maxRequestCount is 0", result is AuthorizationResult.Allowed)
+        }
+    }
 }

@@ -16,7 +16,13 @@ enum class ReasonCode {
     PATH_OUT_OF_BOUNDS,
     OP_NOT_ALLOWED,
     SAF_REVOKED,
-    TIER_VIOLATION
+    TIER_VIOLATION,
+    REQUEST_COUNT_EXCEEDED
+}
+
+enum class TunnelAuditEvent {
+    START,
+    STOP
 }
 
 object AuditLog {
@@ -96,6 +102,104 @@ object AuditLog {
                 } catch (e2: Throwable) {
                     // ignore if JSON is not available
                 }
+            }
+        } catch (t: Throwable) {
+            // Gracefully handle any stub issues on non-Robolectric unit tests
+        }
+    }
+
+    @Synchronized
+    fun recordSuccess(
+        operation: String,
+        sessionId: String,
+        agentIdentity: String = "default_enrolled_agent",
+        path: String,
+        details: String = ""
+    ) {
+        try {
+            val timestamp = System.currentTimeMillis()
+            val lastHash = getLastHash()
+            val detStr = toDeterministicString(timestamp, "SUCCESS", sessionId, details, lastHash)
+            
+            val json = JSONObject(detStr).apply {
+                put("operation", operation)
+                put("path", path)
+                put("agentIdentity", agentIdentity)
+            }
+            
+            val file = logFile
+            if (file != null) {
+                try {
+                    file.appendText(json.toString() + "\n")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    inMemoryEntries.add(json)
+                }
+            } else {
+                inMemoryEntries.add(json)
+            }
+        } catch (t: Throwable) {
+            // Gracefully handle any stub issues on non-Robolectric unit tests
+        }
+    }
+
+    @Synchronized
+    fun recordTunnelEvent(
+        event: TunnelAuditEvent,
+        sessionId: String
+    ) {
+        try {
+            val timestamp = System.currentTimeMillis()
+            val lastHash = getLastHash()
+            val details = "Tunnel event: ${event.name}"
+            val detStr = toDeterministicString(timestamp, "TUNNEL_${event.name}", sessionId, details, lastHash)
+            
+            val json = JSONObject(detStr).apply {
+                put("event", event.name)
+                put("agentIdentity", "default_enrolled_agent")
+            }
+            
+            val file = logFile
+            if (file != null) {
+                try {
+                    file.appendText(json.toString() + "\n")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    inMemoryEntries.add(json)
+                }
+            } else {
+                inMemoryEntries.add(json)
+            }
+        } catch (t: Throwable) {
+            // Gracefully handle any stub issues on non-Robolectric unit tests
+        }
+    }
+
+    @Synchronized
+    fun recordSessionApproval(
+        sessionId: String,
+        agentIdentity: String = "default_enrolled_agent"
+    ) {
+        try {
+            val timestamp = System.currentTimeMillis()
+            val lastHash = getLastHash()
+            val details = "Session approved for agent: $agentIdentity"
+            val detStr = toDeterministicString(timestamp, "SESSION_APPROVAL", sessionId, details, lastHash)
+            
+            val json = JSONObject(detStr).apply {
+                put("agentIdentity", agentIdentity)
+            }
+            
+            val file = logFile
+            if (file != null) {
+                try {
+                    file.appendText(json.toString() + "\n")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    inMemoryEntries.add(json)
+                }
+            } else {
+                inMemoryEntries.add(json)
             }
         } catch (t: Throwable) {
             // Gracefully handle any stub issues on non-Robolectric unit tests

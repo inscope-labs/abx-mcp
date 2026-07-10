@@ -10,6 +10,8 @@ interface TokenIssuer {
         allowedOperations: List<String>,
         allowedRoots: List<String>,
         nonceSeed: String,
+        issuedTime: Long = System.currentTimeMillis(),
+        maxRequestCount: Int = 0,
         alias: String = "ABX_MCP_TOKEN_KEY"
     ): String
 
@@ -28,5 +30,7 @@ data class ParsedToken(
     val expiry: Long,
     val allowedOperations: List<String>,
     val allowedRoots: List<String>,
-    val nonceSeed: String
+    val nonceSeed: String,
+    val issuedTime: Long = System.currentTimeMillis(),
+    val maxRequestCount: Int = 0
 )

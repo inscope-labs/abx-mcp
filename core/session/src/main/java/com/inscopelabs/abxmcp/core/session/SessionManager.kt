@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface SessionManager {
     val stateFlow: StateFlow<SessionState>
+    val sessionId: String?
     
     fun startSession(trigger: UserGesture): Boolean
     fun stopSession(): Boolean

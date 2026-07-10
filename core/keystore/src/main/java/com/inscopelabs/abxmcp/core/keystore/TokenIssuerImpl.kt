@@ -13,6 +13,8 @@ class TokenIssuerImpl(private val keyStoreManager: KeyStoreManager) : TokenIssue
         allowedOperations: List<String>,
         allowedRoots: List<String>,
         nonceSeed: String,
+        issuedTime: Long,
+        maxRequestCount: Int,
         alias: String
     ): String {
         val payloadObj = JSONObject().apply {
@@ -21,6 +23,8 @@ class TokenIssuerImpl(private val keyStoreManager: KeyStoreManager) : TokenIssue
             put("allowedOperations", JSONArray(allowedOperations))
             put("allowedRoots", JSONArray(allowedRoots))
             put("nonceSeed", nonceSeed)
+            put("issuedTime", issuedTime)
+            put("maxRequestCount", maxRequestCount)
         }
         val payloadStr = payloadObj.toString()
         val payloadBase64 = Base64.encodeToString(payloadStr.toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE)
@@ -83,13 +87,17 @@ class TokenIssuerImpl(private val keyStoreManager: KeyStoreManager) : TokenIssue
             }
 
             val nonceSeed = payloadObj.getString("nonceSeed")
+            val issuedTime = payloadObj.optLong("issuedTime", System.currentTimeMillis())
+            val maxRequestCount = payloadObj.optInt("maxRequestCount", 0)
 
             return ParsedToken(
                 sessionId = sessionId,
                 expiry = expiry,
                 allowedOperations = allowedOperations,
                 allowedRoots = allowedRoots,
-                nonceSeed = nonceSeed
+                nonceSeed = nonceSeed,
+                issuedTime = issuedTime,
+                maxRequestCount = maxRequestCount
             )
         } catch (e: Exception) {
             e.printStackTrace()
