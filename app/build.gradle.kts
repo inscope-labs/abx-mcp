@@ -17,8 +17,9 @@ android {
     applicationId = "com.inscopelabs.abxmcp"
     minSdk = 24
     targetSdk = 36
-    versionCode = 7
-    versionName = "7.0"
+    // Bumping versionCode to 8 to address Play Store policy compliance
+    versionCode = 8
+    versionName = "8.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
