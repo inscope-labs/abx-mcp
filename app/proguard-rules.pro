@@ -50,3 +50,8 @@
 -dontwarn org.joda.time.**
 -dontwarn io.ktor.**
 
+# Keep all classes and members in the application and core packages from being stripped/obfuscated
+-keep class com.inscopelabs.abxmcp.** { *; }
+-keep interface com.inscopelabs.abxmcp.** { *; }
+-keep enum com.inscopelabs.abxmcp.** { *; }
+

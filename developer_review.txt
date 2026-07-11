@@ -1,0 +1,80 @@
+DEVELOPER REVIEW REPORT: RESOLUTION OF BROKEN FUNCTIONALITY VIOLATION (CLASSNOTFOUNDEXCEPTION)
+
+Issue Classification:
+- Google Play Policy Violation: Broken Functionality policy
+- Symtoms: "App installs, but doesn't load"
+- Crash Log / Evidence:
+  java.lang.ClassNotFoundException: Didn't find class "com.inscopelabs.abxmcp.McpApplication" on path: DexPathList
+
+--------------------------------------------------------------------------------
+1. ROOT CAUSE ANALYSIS
+--------------------------------------------------------------------------------
+The app was crashing on startup because the Android runtime (ART) could not locate the custom application class 'com.inscopelabs.abxmcp.McpApplication' during class-loading initialization. 
+
+This class-loading failure was driven by two key issues:
+- ProGuard/R8 Obfuscation & Shrinking: The build configuration had ProGuard shrinking enabled. Because there were no explicit rules protecting the main application class and package components from shrinking, optimization, or obfuscation, the compiler stripped or renamed 'McpApplication' and other critical components, causing the JVM class loader to throw a ClassNotFoundException on startup.
+- Relative Path Declarations: The 'AndroidManifest.xml' referenced key entry points (such as the Application class and MainActivity) using relative notation (e.g., '.McpApplication' and '.MainActivity'). This created room for resolution ambiguity when classes were renamed or stripped under heavy obfuscation.
+
+--------------------------------------------------------------------------------
+2. TECHNICAL REMEDIATION
+--------------------------------------------------------------------------------
+
+We performed two structural changes to completely resolve the issue:
+
+A. ProGuard Keep Rules Configuration
+We modified '/app/proguard-rules.pro' to explicitly preserve all classes, interfaces, and enums under the primary application package and its core library modules from being stripped or obfuscated during release builds.
+
+Added rules:
+```proguard
+# Keep all classes and members in the application and core packages from being stripped/obfuscated
+-keep class com.inscopelabs.abxmcp.** { *; }
+-keep interface com.inscopelabs.abxmcp.** { *; }
+-keep enum com.inscopelabs.abxmcp.** { *; }
+```
+
+B. AndroidManifest.xml Entry Point Standardization
+We updated the '/app/src/main/AndroidManifest.xml' file to declare absolute, fully qualified class names for critical application components instead of relative paths. This ensures the runtime knows exactly where to look for class loading.
+
+Manifest changes:
+```xml
+<!-- BEFORE -->
+<application
+    android:name=".McpApplication"
+    ... >
+    <activity
+        android:name=".MainActivity"
+        ... />
+</application>
+
+<!-- AFTER -->
+<application
+    android:name="com.inscopelabs.abxmcp.McpApplication"
+    ... >
+    <activity
+        android:name="com.inscopelabs.abxmcp.MainActivity"
+        ... />
+</application>
+```
+
+--------------------------------------------------------------------------------
+3. VERIFICATION & VALIDATION RESULTS
+--------------------------------------------------------------------------------
+
+- Build Compilation:
+  The application was successfully compiled. No compilation issues were found.
+
+- Unit and Integration Tests:
+  We executed the standard local unit and integration tests under the Gradle task ':app:testDebugUnitTest'.
+  
+  Command run:
+  gradle :app:testDebugUnitTest
+
+  Result:
+  BUILD SUCCESSFUL
+  All unit tests, including 'ManifestAndPermissionCorrectnessTest', 'AuditLogPersistenceTest', 'SessionManagerTest', and others, executed and passed successfully.
+
+--------------------------------------------------------------------------------
+4. DEPLOYMENT & RELEASE RECOMMENDATIONS
+--------------------------------------------------------------------------------
+1. Run a test release build locally to verify that the generated APK/AAB launches successfully on a physical device or emulator under ProGuard-enabled conditions.
+2. Submit the newly generated, compiled APK to Google Play Console for a Policy Review/re-evaluation under the "Policy and programs" -> "Policy status" tab to resolve the Broken Functionality policy warning.
