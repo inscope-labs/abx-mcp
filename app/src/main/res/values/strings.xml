@@ -44,7 +44,7 @@
     <!-- About / Help dialog -->
     <string name="btn_about_info">About &amp; Privacy Policy</string>
     <string name="dialog_about_title">About ABC Server</string>
-    <string name="dialog_about_version">Version 4.0</string>
+    <string name="dialog_about_version">Version 7.0</string>
     <string name="dialog_about_spec">Architecture: Specification v3.0</string>
     <string name="dialog_about_support">Support Email: afterdawn.service@gmail.com</string>
     <string name="dialog_about_privacy_title">Privacy Policy</string>
