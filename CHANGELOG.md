@@ -2,6 +2,26 @@
 
 All notable changes to the ABC Server security client will be documented in this file.
 
+## [2.1.0] - 2026-07-12
+
+### Added
+- **Pillar 2 / Phase B: Preflight Workflow Gate**:
+  - Created `.github/workflows/preflight-release.yml` to act as a mandatory verification check using the actual release build.
+- **Pillar 2 / Phase C: Keep-Rule Coverage Analyzer**:
+  - Implemented a permanent R8 keep-rule coverage and signature checking tool `tools/keep-rule-coverage.sh`.
+  - Configured keep-rule reports to merge directly with the main release artifact verification report output.
+
+### Security & Cleanup
+- **Investigation Artifact Cleanup**:
+  - Cleared repository root clutter including `bundletool.jar`, `classes.dex`, `classes2.dex`, `developer_review.txt`, `PLAY_STORE_SUBMISSION.md`, and `screenshot_export_accounting.txt`.
+  - Modified `.gitignore` to prevent future leakage of JVM-built compilation artifacts, `.apks` bundles, and temporary `.dex` files.
+
+### Note on Prior Investigations
+- **Play Store Startup Crash Root Cause Claim**:
+  The prior investigation report claimed that the Google Play "Broken Functionality" violation, which resulted in startup crashes due to `ClassNotFoundException: Didn't find class "com.inscopelabs.abxmcp.McpApplication"`, was resolved by applying two targeted fixes. First, ProGuard/R8 was configured in `/app/proguard-rules.pro` to explicitly keep and protect the full package of `com.inscopelabs.abxmcp.**` and its core modules from shrinking and obfuscating. Second, relative class pathways inside `AndroidManifest.xml` (such as `.McpApplication` and `.MainActivity`) were standardized to fully-qualified names to resolve look-up ambiguity for key entry points. Together, these adjustments were reported to prevent R8 from stripping away critical application classes during release builds.
+  
+  "NOTE: This is a carried-forward claim from a prior investigation report (developer_review.txt, now removed). It has NOT yet been independently re-verified against the current codebase using the permanent Pillar 2 verification tooling. Verification is scheduled for the gated root-cause phase (see remediation plan v2, Prompt 12)."
+
 ## [2.0.0] - 2026-07-09
 
 ### Added

@@ -7,8 +7,7 @@ object BootRoute {
     fun redirectIfNeeded(activity: Activity): Boolean {
         return try {
             if (BootGuard.hasFailure(activity.applicationContext)) {
-                val recoveryClass = Class.forName("com.inscopelabs.abxmcp.boot.RecoveryActivity")
-                val intent = Intent(activity, recoveryClass).apply {
+                val intent = Intent(activity, RecoveryActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 activity.startActivity(intent)

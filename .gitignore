@@ -16,3 +16,8 @@
 local.properties
 .env
 debug.keystore
+
+*.dex
+*.apks
+/bundletool.jar
+

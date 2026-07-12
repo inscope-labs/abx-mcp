@@ -3,6 +3,7 @@ package com.inscopelabs.abxmcp.boot
 import android.app.Activity
 import android.content.Intent
 import com.inscopelabs.abxmcp.MainActivity
+import com.inscopelabs.abxmcp.McpApplication
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -64,5 +65,31 @@ class BootRouteTest {
         
         val expectedFlags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         assertEquals(expectedFlags, nextIntent.flags and expectedFlags)
+    }
+
+    @Test
+    fun testMainActivityDefensiveNullHandling() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java)
+        val act = controller.get()
+        val app = act.application as McpApplication
+        
+        // Force keyStoreManager to be null
+        app.keyStoreManager = null
+        BootGuard.clear(app)
+        
+        // When triggering onCreate
+        controller.create()
+        
+        // Then it should register a failure in BootGuard
+        assertTrue(BootGuard.hasFailure(app))
+        val failure = BootGuard.currentFailure(app)
+        assertNotNull(failure)
+        assertTrue(failure!!.stage.contains("keyStoreManager unexpectedly null"))
+        
+        // And it should redirect to RecoveryActivity and finish MainActivity
+        assertTrue(act.isFinishing)
+        val nextIntent = shadowOf(act).nextStartedActivity
+        assertNotNull(nextIntent)
+        assertEquals(RecoveryActivity::class.java.name, nextIntent.component?.className)
     }
 }

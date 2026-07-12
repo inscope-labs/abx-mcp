@@ -46,10 +46,17 @@ class MainActivity : ComponentActivity() {
       }
     }
     
-    val keyStoreManager = KeyStoreManager(applicationContext)
-    
-    // Wire AuditLog on app startup before any session or policy engine logic executes
-    com.inscopelabs.abxmcp.core.audit.AuditLog.initialize(applicationContext, keyStoreManager)
+    val app = application as McpApplication
+    val keyStoreManager = app.keyStoreManager ?: run {
+      val exc = IllegalStateException("MainActivity.onCreate — keyStoreManager unexpectedly null")
+      com.inscopelabs.abxmcp.boot.BootGuard.recordFailure(
+        applicationContext,
+        "MainActivity.onCreate — keyStoreManager unexpectedly null",
+        exc
+      )
+      if (com.inscopelabs.abxmcp.boot.BootRoute.redirectIfNeeded(this)) return
+      KeyStoreManager(applicationContext)
+    }
 
     handleIntent(intent)
 
