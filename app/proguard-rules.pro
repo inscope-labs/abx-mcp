@@ -55,3 +55,5 @@
 -keep interface com.inscopelabs.abxmcp.** { *; }
 -keep enum com.inscopelabs.abxmcp.** { *; }
 
+-keep class com.inscopelabs.abxmcp.boot.** { *; }
+
