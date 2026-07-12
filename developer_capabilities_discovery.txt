@@ -1,0 +1,66 @@
+================================================================================
+AI STUDIO AGENT CAPABILITY DISCOVERY & REPOSITORY SYNC REPORT
+================================================================================
+Generated: 2026-07-12
+Target Audience: Developers / Platform Integrators
+Subject: Analysis of Persistent Instructions and GitHub Synchronization
+
+--------------------------------------------------------------------------------
+1. WHAT THE STANDING INSTRUCTIONS SECTION ACTUALLY DOES
+--------------------------------------------------------------------------------
+* **When it is applied:** 
+  The standing/persistent instructions (such as 'AGENTS.md', 'GEMINI.md', or system-level custom prompts) are injected directly into the LLM's system instructions. They are processed and applied **before every single turn** (i.e., with every user-submitted prompt).
+
+* **How it operates:** 
+  It is **purely text-based guidance** that shapes the model's reasoning, behavior, rules, and tool selection. It **cannot** autonomously trigger background execution, cron jobs, shell commands, or API calls *before* a prompt is processed. Any tool calls (such as running a shell command or making a network request) can only be initiated by the agent *during* the active processing of a prompt in response to a user request.
+
+* **Confidence Level:** 
+  *Verified by System Design & Environment Specs.* This is the fundamental architecture of the LLM agent container model. The model is a reactive system; it cannot execute proactive hooks prior to turn initialization.
+
+--------------------------------------------------------------------------------
+2. ABILITY TO PULL OR FETCH FROM THE GITHUB REMOTE
+--------------------------------------------------------------------------------
+* **Direct Pull/Fetch Capability:** 
+  **NO.** We cannot run 'git pull', 'git fetch', or standard git commands. The workspace container filesystem is not initialized as a Git repository and has no local '.git' tracking state.
+
+* **Triggering via Standing Instructions:** 
+  Because there is no local Git repository, we **cannot** configure standing instructions to perform automatic pre-prompt Git pulls or syncs. There is no automated platform hook or setting within the container environment that pulls changes from the GitHub remote before a prompt is run.
+
+* **How the platform syncs:** 
+  The Google AI Studio platform uses a proprietary, server-side external mechanism to push changes from the workspace file tree to GitHub. It behaves as a one-way (push-only) sync from the workspace to the remote.
+
+* **Confidence Level:** 
+  *Verified by direct execution.* Running 'git remote -v && git status' in any directory (including '/' and '/app/applet') fails with: "fatal: not a git repository (or any of the parent directories): .git". Running 'find . -name ".git" -type d' returns zero results.
+
+--------------------------------------------------------------------------------
+3. CLOSEST AVAILABLE ALTERNATIVES
+--------------------------------------------------------------------------------
+Since automatic pre-prompt synchronization is structurally impossible, here are the closest alternatives:
+
+* **No Automatic "Refresh from Repository" Button:** 
+  There is no standard button in the AI Studio sidebar to pull/merge incoming remote changes back into the workspace. Any edits made directly on the GitHub remote website or via external IDEs will be silently overwritten when the agent next pushes its files.
+
+* **File-by-File API Comparison (Manual Workaround):** 
+  If the repository is public (or if the user provides a GitHub Personal Access Token as an environment secret), we can write a custom Python script or use 'curl' with 'read_url_content' to query the GitHub API for a specific file's latest content. We can then compare it against the local version and flag any mismatches. However, this is an expensive, manual, file-by-file check that the agent has to be explicitly instructed to do during a turn; it does not solve full repository sync.
+
+* **Confidence Level:** 
+  *Verified by Environment Specs & General Platform Understanding.*
+
+--------------------------------------------------------------------------------
+4. RECOMMENDED WORDING FOR THE STANDING INSTRUCTIONS SECTION
+--------------------------------------------------------------------------------
+Because the underlying limitation is entirely architectural (the absence of a local Git tracking state and the push-only design of the platform's backend synchronization), **no amount of text in the standing instructions can enable automated repository fetching.**
+
+However, to reduce the risk of pushing stale or reverted content over manual GitHub edits, you can add a defensive check routine to your standing instructions. If you want the agent to proactively check for out-of-sync files before editing them, you can use the following wording in your 'AGENTS.md' or persistent instructions:
+
+```markdown
+# GitHub Stale Content Protection Rules
+
+1. BEFORE modifying any critical configuration, source, or metadata files, the agent MUST ask the user if any manual changes have been made directly on GitHub since the last session.
+2. If the user indicates that changes were made, or if there is high risk, the agent should recommend that the user manually copy-paste the updated file content directly into the AI Studio web editor to update the workspace cache before proceeding.
+3. NEVER assume the local container workspace has fetched or pulled the latest commits from the GitHub remote branch.
+```
+
+* **Honest Assessment:** 
+  While this wording adds a safety prompt to the agent's behavior, it relies entirely on human coordination. The absolute safest practice is to **never perform manual edits directly on GitHub or outside the AI Studio environment** while actively using the AI Studio Build agent.
+================================================================================
