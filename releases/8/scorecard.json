@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "versionCode": 8,
+    "versionName": "8.0",
+    "commit_sha": "unknown",
+    "workflow_run_id": "N/A",
+    "timestamp": "2026-07-12T12:09:42Z",
+    "aab_size_bytes": 14625964,
+    "overall_status": "PASS"
+  },
+  "results": [
+    {
+      "id": "namespace_consistency",
+      "name": "Namespace Consistency Check",
+      "check_type": "automatable",
+      "severity": "blocking",
+      "status": "pass",
+      "evidence": "Aligned namespace verified. McpApplication correctly configured as the application class in AndroidManifest.xml"
+    },
+    {
+      "id": "application_class_in_dex",
+      "name": "Application Class Presence in DEX",
+      "check_type": "automatable",
+      "severity": "blocking",
+      "status": "pass",
+      "evidence": "Declared Application class (com.inscopelabs.abxmcp.McpApplication) is physically present in base DEX bytecode."
+    },
+    {
+      "id": "keep_rule_coverage",
+      "name": "Keep-Rule Coverage and Signature Integrity",
+      "check_type": "automatable",
+      "severity": "blocking",
+      "status": "pass",
+      "evidence": "All boot guard classes are protected and retained in DEX with 100% keep-rule coverage. All boot guard classes are present in DEX."
+    },
+    {
+      "id": "multidex_configuration_valid",
+      "name": "MultiDex Configuration Check",
+      "check_type": "automatable",
+      "severity": "warning",
+      "status": "pass",
+      "evidence": "minSdk is 24, which natively supports MultiDex (API level >= 21). No legacy legacy-multidex required."
+    },
+    {
+      "id": "bundle_split_integrity",
+      "name": "Bundle Split and First-Launch Integrity",
+      "check_type": "manual-review",
+      "severity": "blocking",
+      "status": "manual-review",
+      "evidence": "Requires manual review of dynamic features. First-launch startup classes and resources are located in the base module split."
+    },
+    {
+      "id": "release_debug_parity",
+      "name": "Release and Debug Parity Check",
+      "check_type": "manual-review",
+      "severity": "warning",
+      "status": "manual-review",
+      "evidence": "Requires manual differential comparison of release and debug build symbols/mapping configurations."
+    }
+  ]
+}

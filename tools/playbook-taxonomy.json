@@ -1,0 +1,46 @@
+{
+  "failure_taxonomy": [
+    {
+      "id": "namespace_consistency",
+      "description": "Verifies that the AndroidManifest.xml application package name, Kotlin namespace, Gradle namespace, and applicationId are aligned to prevent automatic keep-rule generation failures caused by manifest package mismatch.",
+      "check_type": "automatable",
+      "severity": "blocking",
+      "responsible_tool_or_script": "tools/verify-release-artifact.sh"
+    },
+    {
+      "id": "application_class_in_dex",
+      "description": "Confirms that the declared Application class (com.inscopelabs.abxmcp.McpApplication) is physically present in the final base DEX bytecode of the built artifact.",
+      "check_type": "automatable",
+      "severity": "blocking",
+      "responsible_tool_or_script": "tools/verify-release-artifact.sh"
+    },
+    {
+      "id": "keep_rule_coverage",
+      "description": "Compares classes declared in the AndroidManifest against ProGuard rules and AGP auto-keep rules (aapt_rules.txt), verifying that all manifest components are retained in full and mapped correctly.",
+      "check_type": "automatable",
+      "severity": "blocking",
+      "responsible_tool_or_script": "tools/keep-rule-coverage.sh"
+    },
+    {
+      "id": "multidex_configuration_valid",
+      "description": "Verifies that MultiDex is correctly configured when minSdk < 21, ensuring the primary DEX does not exceed limit or miss classes during start up.",
+      "check_type": "automatable",
+      "severity": "warning",
+      "responsible_tool_or_script": "tools/verify-release-artifact.sh"
+    },
+    {
+      "id": "bundle_split_integrity",
+      "description": "Ensures that first-launch critical assets, classes, and initialization sequences remain strictly in the base APK rather than a deferred dynamic split bundle.",
+      "check_type": "manual-review",
+      "severity": "blocking",
+      "responsible_tool_or_script": "None (Gap)"
+    },
+    {
+      "id": "release_debug_parity",
+      "description": "Performs a structural and class-level diff of release vs. debug builds to identify resources or classes that are present in debug but stripped or missing in release.",
+      "check_type": "manual-review",
+      "severity": "warning",
+      "responsible_tool_or_script": "None (Gap)"
+    }
+  ]
+}

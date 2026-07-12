@@ -170,7 +170,7 @@ fi
 
 # 3. Inspect DEX contents for McpApplication class presence
 log_info "Running Check 3: Checking DEX for presence of McpApplication..."
-if "$DEXDUMP" "$APK_PATH" | grep -q "Class descriptor  : 'Lcom/inscopelabs/abxmcp/McpApplication;'"; then
+if "$DEXDUMP" "$APK_PATH" | grep "Class descriptor  : 'Lcom/inscopelabs/abxmcp/McpApplication;'" > /dev/null; then
     CHECK_DEX_APP_CLASS="PASS"
     DETAIL_DEX="McpApplication class definition is present in the DEX payload."
     log_pass "McpApplication class exists in the DEX payload."
@@ -238,7 +238,7 @@ log_info "Running Check 6: Verifying other protected classes (com.inscopelabs.ab
 # We've added BootGuard, BootRoute, and RecoveryActivity. Let's make sure they are present in DEX
 BOOT_CLASSES_FOUND=true
 for CLS in "BootGuard" "BootRoute" "RecoveryActivity"; do
-    if "$DEXDUMP" "$APK_PATH" | grep -q "Class descriptor  : 'Lcom/inscopelabs/abxmcp/boot/$CLS;'"; then
+    if "$DEXDUMP" "$APK_PATH" | grep "Class descriptor  : 'Lcom/inscopelabs/abxmcp/boot/$CLS;'" > /dev/null; then
         log_pass "Protected class: com.inscopelabs.abxmcp.boot.$CLS is present in DEX."
     else
         log_fail "Protected class: com.inscopelabs.abxmcp.boot.$CLS is MISSING from DEX!"

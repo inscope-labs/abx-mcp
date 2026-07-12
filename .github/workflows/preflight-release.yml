@@ -1,13 +1,13 @@
 name: Preflight Release Verification
 
 on:
-  workflow_dispatch: # Manual trigger only
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   preflight:
     name: Preflight Release Build & Verify
     runs-on: ubuntu-latest
-    environment: ENV_ABX_MCP
 
     steps:
       - name: Checkout Code

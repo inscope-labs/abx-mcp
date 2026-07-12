@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReleaseScorecard",
+  "type": "OBJECT",
+  "required": ["metadata", "results"],
+  "properties": {
+    "metadata": {
+      "type": "OBJECT",
+      "required": ["versionCode", "versionName", "commit_sha", "workflow_run_id", "timestamp", "aab_size_bytes", "overall_status"],
+      "properties": {
+        "versionCode": { "type": "INTEGER" },
+        "versionName": { "type": "STRING" },
+        "commit_sha": { "type": "STRING" },
+        "workflow_run_id": { "type": "STRING" },
+        "timestamp": { "type": "STRING" },
+        "aab_size_bytes": { "type": "INTEGER" },
+        "overall_status": { "type": "STRING", "enum": ["PASS", "FAIL"] }
+      }
+    },
+    "results": {
+      "type": "ARRAY",
+      "items": {
+        "type": "OBJECT",
+        "required": ["id", "name", "check_type", "severity", "status", "evidence"],
+        "properties": {
+          "id": { "type": "STRING" },
+          "name": { "type": "STRING" },
+          "check_type": { "type": "STRING", "enum": ["automatable", "manual-review"] },
+          "severity": { "type": "STRING", "enum": ["blocking", "warning"] },
+          "status": { "type": "STRING", "enum": ["pass", "fail", "not-applicable", "manual-review"] },
+          "evidence": { "type": "STRING" }
+        }
+      }
+    }
+  }
+}

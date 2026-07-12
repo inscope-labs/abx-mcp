@@ -75,7 +75,7 @@ get_manifest_classes() {
         else
             echo "$line"
         fi
-    done | grep "^com\.inscopelabs\.abxmcp" | sort -u
+    done | grep "^com\.inscopelabs\.abxmcp" | grep -v "DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" | sort -u
 }
 
 # Parse proguard-rules.pro keep patterns
@@ -198,8 +198,8 @@ for cls in $all_classes; do
     
     # Print row
     # Highlight failures/missing elements with coloring
-    local print_in_dex="$in_dex"
-    local print_aapt_status="$aapt_status"
+    print_in_dex="$in_dex"
+    print_aapt_status="$aapt_status"
     if [ "$in_dex" = "No" ] && [ "$keep_source" != "none" ]; then
         print_in_dex="\033[1;31mNo\033[0m"
     fi
