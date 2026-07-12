@@ -89,10 +89,16 @@ DETAIL_DEX=""
 DETAIL_MAPPING=""
 DETAIL_AAPT_RULES=""
 DETAIL_PROGUARD_KEEPS=""
+COVERAGE_JSON=""
 
 write_json_report() {
     local status="$1"
     local error_msg="${2:-""}"
+    local coverage_data="[]"
+    if [ -n "${COVERAGE_JSON:-}" ] && [ -f "$COVERAGE_JSON" ]; then
+        coverage_data=$(cat "$COVERAGE_JSON")
+    fi
+
     cat <<EOF > "$REPORT_PATH"
 {
   "status": "$status",
@@ -111,7 +117,8 @@ write_json_report() {
     "mapping": "$DETAIL_MAPPING",
     "aapt_rules": "$DETAIL_AAPT_RULES",
     "proguard_keeps": "$DETAIL_PROGUARD_KEEPS"
-  }
+  },
+  "coverage": $coverage_data
 }
 EOF
     log_info "Report written to: $REPORT_PATH"
@@ -177,8 +184,13 @@ fi
 # 4. Check mapping.txt if present
 log_info "Running Check 4: Verifying mapping.txt rules..."
 MAPPING_FILE="app/build/outputs/mapping/release/mapping.txt"
-if [ -f "$MAPPING_FILE" ]; then
-    if grep -q "com.inscopelabs.abxmcp.McpApplication ->" "$MAPPING_FILE"; then
+ACTUAL_MAPPING_FILE=$(find app/build -name "mapping.txt" | head -n 1 || true)
+if [ -z "$ACTUAL_MAPPING_FILE" ] && [ -f "$MAPPING_FILE" ]; then
+    ACTUAL_MAPPING_FILE="$MAPPING_FILE"
+fi
+
+if [ -f "$ACTUAL_MAPPING_FILE" ]; then
+    if grep -q "com.inscopelabs.abxmcp.McpApplication ->" "$ACTUAL_MAPPING_FILE"; then
         CHECK_MAPPING_FILE="PASS"
         DETAIL_MAPPING="McpApplication is correctly mapped/kept in mapping.txt"
         log_pass "McpApplication is referenced in mapping.txt"
@@ -198,8 +210,13 @@ fi
 # 5. Check aapt_rules.txt if present
 log_info "Running Check 5: Verifying aapt_rules.txt..."
 AAPT_RULES="app/build/intermediates/aapt_proguard_file/release/aapt_rules.txt"
-if [ -f "$AAPT_RULES" ]; then
-    if grep -q "com.inscopelabs.abxmcp.McpApplication" "$AAPT_RULES"; then
+ACTUAL_AAPT_RULES=$(find app/build -name "aapt_rules.txt" -o -name "*aapt*rules*" | head -n 1 || true)
+if [ -z "$ACTUAL_AAPT_RULES" ] && [ -f "$AAPT_RULES" ]; then
+    ACTUAL_AAPT_RULES="$AAPT_RULES"
+fi
+
+if [ -f "$ACTUAL_AAPT_RULES" ]; then
+    if grep -q "com.inscopelabs.abxmcp.McpApplication" "$ACTUAL_AAPT_RULES"; then
         CHECK_AAPT_RULES="PASS"
         DETAIL_AAPT_RULES="McpApplication is listed in auto-generated aapt_rules.txt"
         log_pass "McpApplication is present in aapt_rules.txt"
@@ -237,6 +254,17 @@ else
     DETAIL_PROGUARD_KEEPS="One or more boot guard classes were stripped from DEX!"
     write_json_report "FAIL" "$DETAIL_PROGUARD_KEEPS"
     exit 6
+fi
+
+# 7. Run companion keep-rule coverage report
+log_info "Running Check 7: Gathering comprehensive Keep-Rule Coverage Report..."
+COVERAGE_JSON="$TEMP_DIR/coverage.json"
+if ./tools/keep-rule-coverage.sh "$APK_PATH" "$ACTUAL_MAPPING_FILE" "$ACTUAL_AAPT_RULES" "$COVERAGE_JSON"; then
+    log_pass "Keep-rule coverage generated successfully."
+else
+    write_json_report "FAIL" "Keep-rule coverage analysis failed or detected a manifest mismatch (v7 signature)."
+    log_fail "Keep-rule coverage check failed."
+    exit 7
 fi
 
 # Complete success write
