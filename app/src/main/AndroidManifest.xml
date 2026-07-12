@@ -32,6 +32,12 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name="com.inscopelabs.abxmcp.boot.RecoveryActivity"
+            android:exported="false"
+            android:label="@string/recovery_title"
+            android:theme="@style/Theme.MyApplication" />
     </application>
 
 </manifest>

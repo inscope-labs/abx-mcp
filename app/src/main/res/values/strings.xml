@@ -90,4 +90,17 @@
     <string name="mock_pairing_title">Mock Gateway Enrollment</string>
     <string name="mock_pairing_prompt">Enter gateway pairing token or click Enroll:</string>
     <string name="dialog_enroll_success">Device enrolled and paired successfully!</string>
+
+    <!-- Recovery Screen Strings -->
+    <string name="recovery_title">Startup Safeguard</string>
+    <string name="recovery_subtitle">A critical problem was encountered during startup. Rest assured, your data is safe. Please copy this report and share it with support.</string>
+    <string name="recovery_stage_label">Failure Stage</string>
+    <string name="recovery_message_label">Failure Message</string>
+    <string name="recovery_device_label">Device Metadata</string>
+    <string name="recovery_stack_label">Stack Trace</string>
+    <string name="recovery_copy_button">Copy Report</string>
+    <string name="recovery_retry_button">Restart App</string>
+    <string name="recovery_unknown_stage">Unknown Stage</string>
+    <string name="recovery_unknown_message">No message was specified in the failure.</string>
+    <string name="recovery_copied">Diagnostic report copied to clipboard</string>
 </resources>
