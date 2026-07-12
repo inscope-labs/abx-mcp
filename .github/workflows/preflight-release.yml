@@ -1,8 +1,7 @@
 name: Preflight Release Verification
 
 on:
-  workflow_call:
-  workflow_dispatch:
+  workflow_dispatch: # Manual trigger only
 
 jobs:
   preflight:
