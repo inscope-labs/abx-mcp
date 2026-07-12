@@ -11,10 +11,46 @@ jobs:
     name: Minimal Scaffolding Diagnostic
     runs-on: ubuntu-latest
     environment: ENV_ABX_MCP
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.1"
+
+      - name: Decode keystore (non-fatal)
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "Keystore decoded to $RUNNER_TEMP/release.jks"
+          else
+            echo "KEYSTORE_BASE64 not set — skipping decode."
+            echo "Build is expected to fail at signing; that failure itself is useful diagnostic information, not an error in this workflow."
+          fi
+
+      - name: Build release AAB (diagnostic, captured)
+        id: build
+        shell: bash
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set +e
+          gradle :app:bundleRelease --no-daemon 2>&1 | tee "$RUNNER_TEMP/gradle-build.log"
+          BUILD_EXIT=${PIPESTATUS[0]}
+          set -e
+          echo "BUILD_EXIT=$BUILD_EXIT" >> "$GITHUB_ENV"
 
       - name: Run diagnostic and write log
         shell: bash
@@ -56,6 +92,28 @@ jobs:
             echo "Diagnostic completed at $(date -u), no build or validation attempted."
           } | tee "$LOGFILE"
 
+          echo "" >> "$LOGFILE"
+          echo "--- Build result ---" >> "$LOGFILE"
+          echo "Gradle exit code: ${BUILD_EXIT:-<not run>}" >> "$LOGFILE"
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          if [ "${BUILD_EXIT:-1}" = "0" ] && [ -f "$AAB" ]; then
+            echo "AAB produced: $AAB" >> "$LOGFILE"
+            echo "AAB size (bytes): $(stat -c%s "$AAB")" >> "$LOGFILE"
+            echo "AAB sha256: $(sha256sum "$AAB" | awk '{print $1}')" >> "$LOGFILE"
+          else
+            echo "AAB NOT produced (build failed or was skipped)." >> "$LOGFILE"
+          fi
+          echo "" >> "$LOGFILE"
+          echo "--- Android SDK (informational only, no validation performed) ---" >> "$LOGFILE"
+          echo "ANDROID_SDK_ROOT: ${ANDROID_SDK_ROOT:-<unset>}" >> "$LOGFILE"
+          if [ -n "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT/build-tools" ]; then
+            echo "Installed build-tools versions:" >> "$LOGFILE"
+            ls -1 "$ANDROID_SDK_ROOT/build-tools" >> "$LOGFILE"
+          fi
+          echo "" >> "$LOGFILE"
+          echo "--- Gradle build log (last 150 lines) ---" >> "$LOGFILE"
+          tail -n 150 "$RUNNER_TEMP/gradle-build.log" >> "$LOGFILE" 2>/dev/null || echo "gradle log not found" >> "$LOGFILE"
+
           echo "LOGFILE_PATH=$LOGFILE" >> "$GITHUB_ENV"
 
       - name: Write job summary
@@ -83,4 +141,13 @@ jobs:
         with:
           name: preflight-minimal-log-${{ github.run_number }}
           path: diagnostics/preflight-minimal/
+          retention-days: 14
+
+      - name: Upload AAB as artifact (if produced)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-diagnostic-aab-${{ github.run_number }}
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: warn
           retention-days: 14
