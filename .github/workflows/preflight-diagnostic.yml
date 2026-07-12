@@ -1,0 +1,86 @@
+name: Preflight Diagnostic (Minimal)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnostic:
+    name: Minimal Scaffolding Diagnostic
+    runs-on: ubuntu-latest
+    environment: ENV_ABX_MCP
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run diagnostic and write log
+        shell: bash
+        run: |
+          mkdir -p diagnostics/preflight-minimal
+          TS="$(date -u +%Y%m%dT%H%M%SZ)"
+          LOGFILE="diagnostics/preflight-minimal/run-${{ github.run_number }}-${TS}.log"
+
+          {
+            echo "Preflight Minimal Diagnostic"
+            echo "Run number: ${{ github.run_number }}"
+            echo "Run ID: ${{ github.run_id }}"
+            echo "Triggered (UTC): $(date -u)"
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Ref: $GITHUB_REF"
+            echo "Runner: $(uname -a)"
+            echo ""
+            echo "--- Secret presence (booleans only, values never printed) ---"
+            if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+              echo "KEYSTORE_BASE64: present"
+            else
+              echo "KEYSTORE_BASE64: MISSING"
+            fi
+            if [ -n "${{ secrets.STORE_PASSWORD }}" ]; then
+              echo "STORE_PASSWORD: present"
+            else
+              echo "STORE_PASSWORD: MISSING"
+            fi
+            if [ -n "${{ secrets.KEY_PASSWORD }}" ]; then
+              echo "KEY_PASSWORD: present"
+            else
+              echo "KEY_PASSWORD: MISSING"
+            fi
+            echo ""
+            echo "--- Android SDK environment (informational only, not exercised) ---"
+            echo "ANDROID_SDK_ROOT: ${ANDROID_SDK_ROOT:-<unset>}"
+            echo "ANDROID_HOME: ${ANDROID_HOME:-<unset>}"
+            echo ""
+            echo "Diagnostic completed at $(date -u), no build or validation attempted."
+          } | tee "$LOGFILE"
+
+          echo "LOGFILE_PATH=$LOGFILE" >> "$GITHUB_ENV"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## Preflight Minimal Diagnostic" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "$LOGFILE_PATH" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "log file not found" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push diagnostic log
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/preflight-minimal/
+          git commit -m "chore(diagnostics): preflight minimal run ${{ github.run_number }}" || echo "nothing to commit"
+          git push
+
+      - name: Upload log as artifact (redundant safety net)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-minimal-log-${{ github.run_number }}
+          path: diagnostics/preflight-minimal/
+          retention-days: 14
