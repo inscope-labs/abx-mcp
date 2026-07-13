@@ -24,11 +24,15 @@ dependencyResolutionManagement {
 
 rootProject.name = "ABC Server"
 
+val stage = providers.gradleProperty("stage").getOrElse("0").toInt()
+
 include(":app")
-include(":core:keystore")
-include(":core:session")
-include(":core:tunnel")
-include(":core:policy")
-include(":core:filesystem")
-include(":core:mcp")
-include(":core:audit")
+if (stage >= 2) include(":core:keystore")
+if (stage >= 3) include(":core:audit")
+if (stage >= 5) {
+  include(":core:session")
+  include(":core:tunnel")
+  include(":core:policy")
+  include(":core:filesystem")
+  include(":core:mcp")
+}

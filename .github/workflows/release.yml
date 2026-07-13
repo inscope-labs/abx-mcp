@@ -1,7 +1,12 @@
 name: Build Signed Release AAB
 
 on:
-  workflow_dispatch:   # manual trigger only — never runs automatically
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Bisection stage (0-8)'
+        required: true
+        default: '0'
 
 jobs:
   release:
@@ -53,7 +58,7 @@ jobs:
           KEYSTORE_PATH: ${{ github.workspace }}/upload-key.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle :app:bundleRelease
+        run: gradle :app:bundleRelease -Pstage=${{ inputs.stage }}
 
       - name: Verify output AAB is actually signed
         run: |
