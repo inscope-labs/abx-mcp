@@ -1,0 +1,189 @@
+Preflight Minimal Diagnostic
+Run number: 3
+Run ID: 29216131830
+Triggered (UTC): Mon Jul 13 00:54:33 UTC 2026
+Repository: inscope-labs/abx-mcp
+Ref: refs/heads/main
+Runner: Linux runnervm5mmn9 6.17.0-1018-azure #18~24.04.1-Ubuntu SMP Thu May 28 16:39:11 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+
+--- Secret presence (booleans only, values never printed) ---
+KEYSTORE_BASE64: present
+STORE_PASSWORD: present
+KEY_PASSWORD: present
+
+--- Android SDK environment (informational only, not exercised) ---
+ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+ANDROID_HOME: /usr/local/lib/android/sdk
+
+Diagnostic completed at Mon Jul 13 00:54:33 UTC 2026, no build or validation attempted.
+
+--- Build result ---
+Gradle exit code: 0
+AAB produced: app/build/outputs/bundle/release/app-release.aab
+AAB size (bytes): 14626056
+AAB sha256: 9267956f93441f1e05a939c1a8e2ca114e2bb5e71ecbab11d5006cd824d7178d
+
+--- Android SDK (informational only, no validation performed) ---
+ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+Installed build-tools versions:
+34.0.0
+35.0.0
+35.0.1
+36.0.0
+36.1.0
+37.0.0
+
+--- Gradle build log (last 150 lines) ---
+> Task :core:mcp:mergeReleaseAssets
+> Task :core:session:generateReleaseAssets UP-TO-DATE
+> Task :core:policy:mergeReleaseAssets
+> Task :core:tunnel:generateReleaseAssets UP-TO-DATE
+> Task :core:session:mergeReleaseAssets
+> Task :core:tunnel:mergeReleaseAssets
+> Task :core:keystore:compileReleaseKotlin FROM-CACHE
+> Task :core:keystore:javaPreCompileRelease FROM-CACHE
+> Task :core:keystore:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:mergeReleaseAssets
+> Task :core:audit:javaPreCompileRelease FROM-CACHE
+> Task :core:session:javaPreCompileRelease FROM-CACHE
+> Task :core:tunnel:javaPreCompileRelease FROM-CACHE
+> Task :core:policy:javaPreCompileRelease FROM-CACHE
+> Task :core:mcp:javaPreCompileRelease FROM-CACHE
+> Task :core:keystore:mergeReleaseGeneratedProguardFiles
+> Task :core:keystore:exportReleaseConsumerProguardFiles
+> Task :core:keystore:bundleLibCompileToJarRelease
+> Task :core:filesystem:compileReleaseKotlin NO-SOURCE
+> Task :core:filesystem:javaPreCompileRelease FROM-CACHE
+> Task :core:filesystem:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:parseReleaseLocalResources FROM-CACHE
+> Task :app:processReleaseMainManifest
+> Task :core:filesystem:mergeReleaseGeneratedProguardFiles
+> Task :core:filesystem:exportReleaseConsumerProguardFiles
+> Task :core:audit:compileReleaseKotlin FROM-CACHE
+> Task :core:audit:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:generateReleaseBuildConfig
+> Task :core:audit:mergeReleaseGeneratedProguardFiles
+> Task :core:audit:bundleLibCompileToJarRelease
+> Task :core:audit:exportReleaseConsumerProguardFiles
+> Task :app:generateReleaseRFile FROM-CACHE
+> Task :core:filesystem:bundleLibCompileToJarRelease
+> Task :core:session:compileReleaseKotlin FROM-CACHE
+> Task :core:session:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:javaPreCompileRelease FROM-CACHE
+> Task :core:session:mergeReleaseGeneratedProguardFiles
+> Task :core:session:bundleLibCompileToJarRelease
+> Task :core:session:exportReleaseConsumerProguardFiles
+> Task :core:policy:compileReleaseKotlin FROM-CACHE
+> Task :core:policy:compileReleaseJavaWithJavac NO-SOURCE
+> Task :core:policy:bundleLibCompileToJarRelease
+> Task :core:tunnel:compileReleaseKotlin FROM-CACHE
+> Task :core:tunnel:compileReleaseJavaWithJavac NO-SOURCE
+> Task :core:tunnel:mergeReleaseGeneratedProguardFiles
+> Task :app:processReleaseManifest
+> Task :app:processApplicationManifestReleaseForBundle
+> Task :core:mcp:compileReleaseKotlin FROM-CACHE
+> Task :core:tunnel:exportReleaseConsumerProguardFiles
+> Task :core:policy:mergeReleaseGeneratedProguardFiles
+> Task :core:mcp:compileReleaseJavaWithJavac NO-SOURCE
+> Task :core:mcp:mergeReleaseGeneratedProguardFiles
+> Task :core:policy:exportReleaseConsumerProguardFiles
+> Task :core:mcp:exportReleaseConsumerProguardFiles
+> Task :core:mcp:bundleLibCompileToJarRelease
+> Task :core:audit:prepareReleaseArtProfile
+> Task :core:filesystem:prepareReleaseArtProfile
+> Task :core:keystore:prepareReleaseArtProfile
+> Task :core:mcp:prepareReleaseArtProfile
+> Task :core:tunnel:bundleLibCompileToJarRelease
+> Task :core:policy:prepareReleaseArtProfile
+> Task :core:session:prepareReleaseArtProfile
+> Task :app:processReleaseManifestForPackage
+> Task :core:tunnel:prepareReleaseArtProfile
+> Task :app:mergeReleaseArtProfile
+> Task :core:audit:bundleLibRuntimeToJarRelease
+> Task :core:filesystem:bundleLibRuntimeToJarRelease
+> Task :core:keystore:bundleLibRuntimeToJarRelease
+> Task :core:mcp:bundleLibRuntimeToJarRelease
+> Task :app:checkReleaseDuplicateClasses
+> Task :core:policy:bundleLibRuntimeToJarRelease
+> Task :core:session:bundleLibRuntimeToJarRelease
+> Task :core:tunnel:bundleLibRuntimeToJarRelease
+> Task :app:extractProguardFiles
+> Task :core:filesystem:processReleaseJavaRes NO-SOURCE
+> Task :core:keystore:processReleaseJavaRes
+> Task :core:audit:processReleaseJavaRes
+> Task :core:mcp:processReleaseJavaRes
+> Task :core:policy:processReleaseJavaRes
+> Task :core:tunnel:processReleaseJavaRes
+> Task :app:mergeReleaseStartupProfile
+> Task :core:session:processReleaseJavaRes
+> Task :app:mergeReleaseJniLibFolders
+> Task :core:audit:mergeReleaseJniLibFolders
+> Task :core:filesystem:mergeReleaseJniLibFolders
+> Task :core:audit:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:filesystem:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:audit:copyReleaseJniLibsProjectOnly
+> Task :core:filesystem:copyReleaseJniLibsProjectOnly
+> Task :core:keystore:mergeReleaseJniLibFolders
+> Task :core:keystore:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:mcp:mergeReleaseJniLibFolders
+> Task :core:keystore:copyReleaseJniLibsProjectOnly
+> Task :core:mcp:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:policy:mergeReleaseJniLibFolders
+> Task :core:mcp:copyReleaseJniLibsProjectOnly
+> Task :core:policy:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:session:mergeReleaseJniLibFolders
+> Task :core:policy:copyReleaseJniLibsProjectOnly
+> Task :core:session:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:tunnel:mergeReleaseJniLibFolders
+> Task :core:session:copyReleaseJniLibsProjectOnly
+> Task :core:tunnel:mergeReleaseNativeLibs NO-SOURCE
+> Task :core:tunnel:copyReleaseJniLibsProjectOnly
+> Task :app:writeReleaseAppMetadata
+> Task :app:collectReleaseDependencies
+> Task :app:configureReleaseDependencies
+> Task :app:parseReleaseIntegrityConfig FROM-CACHE
+> Task :app:validateSigningRelease
+> Task :app:mergeReleaseNativeLibs
+> Task :app:processReleaseResources
+> Task :app:stripReleaseDebugSymbols
+> Task :app:extractReleaseNativeSymbolTables FROM-CACHE
+> Task :app:bundleReleaseResources
+> Task :app:kspReleaseKotlin
+
+> Task :app:compileReleaseKotlin
+w: file:///home/runner/work/abx-mcp/abx-mcp/app/src/main/java/com/inscopelabs/abxmcp/EnrollmentScreen.kt:145:48 'val isInsideSecureHardware: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/abx-mcp/abx-mcp/app/src/main/java/com/inscopelabs/abxmcp/EnrollmentScreen.kt:438:49 'val Icons.Filled.Help: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Help.
+w: file:///home/runner/work/abx-mcp/abx-mcp/app/src/main/java/com/inscopelabs/abxmcp/EnrollmentScreen.kt:1075:49 'val outlinedButtonBorder: BorderStroke' is deprecated. Please use the version that takes an `enabled` param to get the `BorderStroke` with the correct opacity.
+
+> Task :app:processReleaseJavaRes
+> Task :app:mergeReleaseJavaResource
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:minifyReleaseWithR8
+WARNING: /home/runner/.gradle/caches/9.6.1/transforms/e580ed803b290f99b1c39559800421a7/transformed/play-services-recaptchabase-16.1.0-runtime.jar: R8: The companion object Companion could not be found in class com.google.android.gms.internal.recaptchabase.zzm
+WARNING: /home/runner/.gradle/caches/9.6.1/transforms/e580ed803b290f99b1c39559800421a7/transformed/play-services-recaptchabase-16.1.0-runtime.jar: R8: The companion object Companion could not be found in class com.google.android.gms.internal.recaptchabase.zzl
+
+> Task :app:buildReleasePreBundle
+> Task :app:compileReleaseArtProfile
+> Task :app:packageReleaseBundle
+> Task :app:signReleaseBundle
+> Task :app:bundleRelease
+> Task :app:produceReleaseBundleIdeListingFile
+> Task :app:createReleaseBundleListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/build-1783903824510.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/abx-mcp/abx-mcp/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 20s
+194 actionable tasks: 113 executed, 81 from cache
+Configuration cache entry stored.
+
+--- Version bump ---
+versionCode bumped to: 9
