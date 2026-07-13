@@ -27,7 +27,7 @@ if (stage >= 7) {
 
 android {
   namespace = "com.inscopelabs.abxmcp"
-  compileSdk = if (stage >= 7) 36 else 35
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.inscopelabs.abxmcp"
@@ -109,18 +109,26 @@ android {
 }
 
 if (stage >= 7) {
-  secrets {
+  configure<com.google.android.libraries.mapsplatform.secrets_gradle_plugin.SecretsPluginExtension> {
     propertiesFileName = ".env"
     defaultPropertiesFileName = ".env.abxmcp"
   }
-  googleServices {
-    missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN
+  val googleServices = extensions.findByName("googleServices")
+  if (googleServices != null) {
+    try {
+      val method = googleServices.javaClass.methods.firstOrNull { 
+        it.name == "setMissingGoogleServicesStrategy" && it.parameterCount == 1 
+      }
+      method?.invoke(googleServices, MissingGoogleServicesStrategy.WARN)
+    } catch (e: Exception) {
+      // ignore
+    }
   }
 }
 
 dependencies {
   implementation(libs.androidx.core.ktx)
-  implementation(libs.androidx.appcompat)
+  implementation("androidx.appcompat:appcompat:1.7.0")
 
   if (stage >= 2) implementation(project(":core:keystore"))
   if (stage >= 3) implementation(project(":core:audit"))
@@ -188,4 +196,23 @@ dependencies {
 
 tasks.withType<Test> {
   useJUnitPlatform()
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+  if (stage == 0) {
+    exclude { element ->
+      element.file.absolutePath.contains("src/main/java")
+    }
+  }
+}
+
+kotlin {
+  sourceSets.all {
+    println("DEBUG: Kotlin source set name: $name dirs: ${kotlin.srcDirs}")
+    if (name == "debug" || name == "release") {
+      if (stage == 0) {
+        kotlin.setSrcDirs(listOf("src/stage0/java"))
+      }
+    }
+  }
 }
