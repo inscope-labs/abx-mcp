@@ -45,3 +45,17 @@ so it can be read outside this environment.
 Only make the changes explicitly requested in the current prompt. Do
 not regenerate, reformat, or "improve" files beyond what was asked,
 even if it seems in the spirit of the request.
+
+## 4. version.properties Is CI-Owned — Never Write To It
+
+version.properties is exclusively written by the diagnostic workflow's
+automated versionCode bump logic (.github/workflows/preflight-diagnostic.yml).
+It must never be edited by you, under any circumstances, even
+incidentally as part of a broader commit that happens to include it.
+
+If your workspace snapshot contains a copy of version.properties that
+differs from the current value on GitHub `main`, do not include it in
+any commit you push — explicitly exclude it, and note the discrepancy
+in your agent-reports/ entry for that task instead. Never resolve a
+difference by overwriting the GitHub value with your local one.
+

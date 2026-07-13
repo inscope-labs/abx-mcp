@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
   alias(libs.plugins.android.application)
@@ -9,6 +11,10 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val versionProps = Properties().apply {
+    load(FileInputStream(rootProject.file("version.properties")))
+}
+
 android {
   namespace = "com.inscopelabs.abxmcp"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,9 +23,8 @@ android {
     applicationId = "com.inscopelabs.abxmcp"
     minSdk = 24
     targetSdk = 36
-    // Bumping versionCode to 8 to address Play Store policy compliance
-    versionCode = 8
-    versionName = "8.0"
+    versionCode = versionProps.getProperty("versionCode").trim().toInt()
+    versionName = versionProps.getProperty("versionName").trim()
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

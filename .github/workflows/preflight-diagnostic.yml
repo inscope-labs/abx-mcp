@@ -15,6 +15,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump versionCode (self-healing) and commit
+        shell: bash
+        run: |
+          if [ ! -f version.properties ]; then
+            echo "::error::version.properties not found — cannot bump versionCode."
+            exit 1
+          fi
+
+          CURRENT=$(grep -oP '(?<=^versionCode=).*' version.properties)
+          HISTORICAL_MAX=$(git log --all -p -- version.properties | grep -oP '^\+versionCode=\K[0-9]+' | sort -n | tail -1)
+
+          BASELINE=$CURRENT
+          if [ -n "$HISTORICAL_MAX" ] && [ "$HISTORICAL_MAX" -gt "$CURRENT" ]; then
+            echo "::warning::Current versionCode ($CURRENT) is lower than the historical high-water mark ($HISTORICAL_MAX) found in git history. This suggests version.properties was overwritten by a stale external push (e.g. the AI Studio agent's local mirror). Using $HISTORICAL_MAX as the baseline instead of $CURRENT to avoid reissuing an already-used versionCode."
+            BASELINE=$HISTORICAL_MAX
+          fi
+
+          NEXT=$((BASELINE + 1))
+          sed -i "s/^versionCode=.*/versionCode=$NEXT/" version.properties
+
+          echo "versionCode: current=$CURRENT historical_max=${HISTORICAL_MAX:-none} -> next=$NEXT"
+          echo "BUMPED_VERSION_CODE=$NEXT" >> "$GITHUB_ENV"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.properties
+          git commit -m "chore(diagnostic): bump versionCode to $NEXT [skip ci]"
+          git push
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -113,6 +144,10 @@ jobs:
           echo "" >> "$LOGFILE"
           echo "--- Gradle build log (last 150 lines) ---" >> "$LOGFILE"
           tail -n 150 "$RUNNER_TEMP/gradle-build.log" >> "$LOGFILE" 2>/dev/null || echo "gradle log not found" >> "$LOGFILE"
+
+          echo "" >> "$LOGFILE"
+          echo "--- Version bump ---" >> "$LOGFILE"
+          echo "versionCode bumped to: ${BUMPED_VERSION_CODE:-<unknown>}" >> "$LOGFILE"
 
           echo "LOGFILE_PATH=$LOGFILE" >> "$GITHUB_ENV"
 
